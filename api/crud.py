@@ -1,7 +1,7 @@
 from typing import List
 from datetime import datetime
 from fastapi import HTTPException
-from sqlmodel import select
+from sqlmodel import select, delete
 from api.models import (
     File,
     Project,
@@ -72,12 +72,14 @@ class CRUDProject:
             raise HTTPException(status_code=404, detail="Project not found")
 
         for key, value in project_update.dict(exclude_unset=True).items():
+            if key == "paths":
+                continue
             setattr(project, key, value)
 
         if "paths" in project_update.dict(exclude_unset=True):
-            db.exec(
-                select(ProjectFileLink).where(ProjectFileLink.project_id == project_id)
-            ).delete()
+            db.execute(
+                delete(ProjectFileLink).where(ProjectFileLink.project_id == project_id)
+            )
             db.commit()
 
             for path in project_update.paths:

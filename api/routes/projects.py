@@ -33,28 +33,22 @@ def read_project(*, session: SessionDep, project_id: int):
 
 @router.put("/{project_id}", response_model=ProjectRead)
 def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
-    project = crud_project.get_project(session, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return crud_project.update_project(session, project, project)
+    return crud_project.update_project(session, project_id, project)
 
 
 @router.delete("/{project_id}")
 def remove_project(*, session: SessionDep, project_id: int):
-    project = crud_project.get_project(session, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    crud_project.delete_project(session, project)
-    return {"message": "Project deleted"}
+    crud_project.delete_project(session, project_id)
+    return {"message": "Project deleted successfully"}
 
 
 @router.post("/{project_id}/process")
-def modify_process(*, session: SessionDep, project_id: int, config: ConfigProcess):
+def process_data(*, session: SessionDep, project_id: int, config: ConfigProcess):
     config.project_id = project_id
     return crud_config_process.create_process(session, config)
 
 
 @router.post("/{project_id}/render")
-def modify_render(*, session: SessionDep, project_id: int, config: ConfigRender):
+def create_render_config(*, session: SessionDep, project_id: int, config: ConfigRender):
     config.project_id = project_id
     return crud_config_render.create_render(session, config)
