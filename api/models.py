@@ -15,6 +15,9 @@ class ProjectFileLink(SQLModel, table=True):
 class File(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     path: str
+    projects: List["Project"] = Relationship(
+        back_populates="files", link_model=ProjectFileLink
+    )
 
 
 class ProjectBase(SQLModel):
@@ -43,7 +46,6 @@ class ProjectRead(ProjectBase):
     paths: List[str] = []
 
 
-File.projects = Relationship(back_populates="files", link_model=ProjectFileLink)
 # ----------------------------
 # ----------------------------
 
