@@ -1,4 +1,5 @@
 from typing import List
+from datetime import datetime
 from fastapi import HTTPException
 from sqlmodel import select
 from api.models import (
@@ -6,6 +7,7 @@ from api.models import (
     Project,
     ProjectCreate,
     ProjectRead,
+    ProjectUpdate,
     ProjectFileLink,
     ConfigProcess,
     ConfigProcessCreate,
@@ -53,8 +55,43 @@ class CRUDProject:
 
     def get_project(self, db: SessionDep, project_id: int) -> ProjectRead:
         project = db.get(Project, project_id)
+        project.last_opened = datetime.utcnow()
+        db.add(project)
+        db.commit()
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
+        project_read = ProjectRead.from_orm(project)
+        project_read.paths = [file.path for file in project.files]
+        return project_read
+
+    def update_project(
+        self, db: SessionDep, project_id: int, project_update: ProjectUpdate
+    ):
+        project = db.get(Project, project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        for key, value in project_update.dict(exclude_unset=True).items():
+            setattr(project, key, value)
+
+        if "paths" in project_update.dict(exclude_unset=True):
+            db.exec(
+                select(ProjectFileLink).where(ProjectFileLink.project_id == project_id)
+            ).delete()
+            db.commit()
+
+            for path in project_update.paths:
+                file = db.exec(select(File).where(File.path == path)).first()
+                if not file:
+                    file = File(path=path)
+                    db.add(file)
+                    db.commit()
+                    db.refresh(file)
+                link = ProjectFileLink(project_id=project.id, file_id=file.id)
+                db.add(link)
+
+        db.commit()
+        db.refresh(project)
         project_read = ProjectRead.from_orm(project)
         project_read.paths = [file.path for file in project.files]
         return project_read

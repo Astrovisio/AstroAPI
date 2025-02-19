@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 from api.models import (
-    Project,
+    ProjectCreate,
+    ProjectUpdate,
     ProjectRead,
     ConfigProcess,
     ConfigRender,
@@ -18,7 +19,7 @@ def read_projects(*, session: SessionDep):
 
 
 @router.post("/", response_model=ProjectRead)
-def create_new_project(*, session: SessionDep, project: Project):
+def create_new_project(*, session: SessionDep, project: ProjectCreate):
     return crud_project.create_project(session, project)
 
 
@@ -28,6 +29,14 @@ def read_project(*, session: SessionDep, project_id: int):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+@router.put("/{project_id}", response_model=ProjectRead)
+def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
+    project = crud_project.get_project(session, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return crud_project.update_project(session, project, project)
 
 
 @router.delete("/{project_id}")

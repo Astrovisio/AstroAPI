@@ -46,6 +46,10 @@ class ProjectRead(ProjectBase):
     paths: List[str] = []
 
 
+class ProjectUpdate(ProjectBase):
+    paths: List[str] = []
+
+
 # ----------------------------
 # ----------------------------
 
