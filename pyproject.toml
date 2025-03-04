@@ -5,7 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "astropy>=6.1.7",
     "fastapi[standard]>=0.115.8",
+    "pynbody>=2.0.0",
+    "spectral-cube>=0.6.6",
     "sqlmodel>=0.0.22",
     "uvicorn>=0.34.0",
 ]
