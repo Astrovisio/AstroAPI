@@ -1,6 +1,6 @@
 import pynbody
 from spectral_cube import SpectralCube
-from .utils import getFileType
+from src.utils import getFileType
 
 def loadSimulation(path:str) -> pynbody.snapshot:
     

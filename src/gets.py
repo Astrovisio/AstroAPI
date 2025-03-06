@@ -1,7 +1,9 @@
 import pynbody
-from .loaders import loadSimulation, loadObservation
-from .utils import getFileType
+from src.loaders import loadSimulation, loadObservation
+from src.utils import getFileType
+from api.models import ConfigProcessCreate
 from spectral_cube import SpectralCube
+from typing import List
 
 def getKeys(path:str) -> list:
     
@@ -16,33 +18,43 @@ def getKeys(path:str) -> list:
         
         return keys
     
-def getThresholds(path:str) -> dict:
+def getThresholds(path:str) -> List[ConfigProcessCreate]:
     
     if getFileType(path)=="fits":
-        
+             
+        res = []
         cube = loadObservation(path)
         velo, dec, ra = cube.world[:]  
         
-        thresholds = {
-            "x_min": float(ra.min().value),
-            "x_max": float(ra.max().value),
-            "y_min": float(dec.min().value),
-            "y_max": float(dec.max().value),
-            "v_min": float(velo.min().value),
-            "v_max": float(velo.max().value)
-        }
+      
+        res.append(ConfigProcessCreate(thr_min = float(ra.min().value),
+                            thr_max = float(ra.max().value),
+                            unit = "rad",
+                            var_name = "x"))
+        res.append(ConfigProcessCreate(thr_min = float(dec.min().value),
+                            thr_max = float(dec.max().value),
+                            unit = "rad",
+                            var_name = "y"))
+        res.append(ConfigProcessCreate(thr_min = float(velo.min().value),
+                            thr_max = float(velo.max().value),
+                            unit = "m/s",
+                            var_name = "v"))
         
         del cube
         
-        return thresholds
+        return res
     
     else:        
         sim = loadSimulation(path)
-        res = {}        
+        res = []        
         
         for key in sim.loadable_keys():
             try:
-                res[f"{key}_min"], res[f"{key}_max"]  = float(sim[key].min()), float(sim[key].max())
+                res.append(res.append(ConfigProcessCreate(thr_min = float(sim[key].min())),
+                            thr_max = float(sim[key].max(),
+                            unit = str(sim[key].units),
+                            var_name = key)))
+                
             except(KeyError, pynbody.units.UnitsException):
                 pass
             

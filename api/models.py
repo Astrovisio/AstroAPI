@@ -7,6 +7,7 @@ class VariableConfig(SQLModel):
     thr_min: float
     thr_max: float
     selected: bool
+    unit: str
     x_axis: bool
     y_axis: bool
     z_axis: bool
