@@ -4,8 +4,17 @@ on: [push]
 
 jobs:
   unit-tests:
-    name: python
+    name: unit-tests
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      statuses: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GITHUB_SHA: ${{ github.sha }}
+      STATUSES_URL: ${{ github.api_url }}/repos/${{ github.repository }}/statuses/${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4
