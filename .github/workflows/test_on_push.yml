@@ -22,4 +22,29 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run tests
-        run: uv run pytest -v
+        run: |
+          uv add coverage
+          uv run coverage run -m pytest -v
+      - name: Display coverage
+        id: display-coverage
+        run: |
+          COVERAGE=$(uv run coverage report --format=total)
+          echo "Coverage: $COVERAGE"
+          echo "coverage=$COVERAGE" >> $GITHUB_ENV
+      - name: Set GitHub commit status
+        if: success()
+        run: |
+          if [ -n "${GITHUB_TOKEN}" ] && [ -n "${GITHUB_REPOSITORY}" ] && [ -n "${STATUSES_URL}" ]; then
+            COVERAGE=$(echo ${{ env.coverage }} | tr -d '%')
+            DESCRIPTION="Test coverage: ${COVERAGE}%"
+            STATE="success"
+            curl -f -s --show-error -X POST \
+              --url "${STATUSES_URL}" \
+              -H 'accept: application/vnd.github.v3+json' \
+              -H "authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'content-type: application/json' \
+              -d "{ \"state\": \"${STATE}\", 
+                    \"target_url\": \"https://${GITHUB_DOMAIN:-github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\", 
+                    \"description\": \"${DESCRIPTION}\", \"context\": \"Coverage\"
+                }"
+          fi
