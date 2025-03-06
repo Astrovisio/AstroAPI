@@ -49,7 +49,7 @@ def update_project(*, session: SessionDep, project_id: int, project: ProjectUpda
     project_db = crud_project.update_project(session, project_id, project)
     new_confs_db = []
     conf_read = crud_config_process.get_config_process(session, project_id)
-    if "paths" in project.dict(exclude_unset=True):
+    if "paths" in project.model_dump(exclude_unset=True):
         confs = read_data(project_db.files)
         crud_config_process.delete_config_process(session, project_id)
         for conf in confs:

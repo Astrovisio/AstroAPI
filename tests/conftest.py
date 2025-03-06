@@ -3,18 +3,13 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.db import get_session
 from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
 
-TEST_DATABASE_URL = "sqlite://"
+TEST_DATABASE_URL = "sqlite:///test.db"
 
 
 @pytest.fixture(name="session")
 def session_fixture():
-    engine = create_engine(
-        TEST_DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
@@ -40,3 +35,12 @@ def new_project():
         "description": "A test project",
         "paths": ["file1", "file2"],
     }
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_database():
+    yield
+    import os
+
+    if os.path.exists("test.db"):
+        os.remove("test.db")

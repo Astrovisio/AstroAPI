@@ -147,12 +147,12 @@ class CRUDProject:
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
-        for key, value in project_update.dict(exclude_unset=True).items():
+        for key, value in project_update.model_dump(exclude_unset=True).items():
             if key == "paths":
                 continue
             setattr(project, key, value)
 
-        if "paths" in project_update.dict(exclude_unset=True):
+        if "paths" in project_update.model_dump(exclude_unset=True):
             ids = db.exec(
                 select(ProjectFileLink.file_id).where(
                     ProjectFileLink.project_id == project_id
@@ -168,18 +168,16 @@ class CRUDProject:
             paths_to_create = new_paths - current_paths
             if paths_to_delete:
                 db.exec(delete(File).where(File.path.in_(paths_to_delete)))
+                db.exec(delete(ProjectFileLink).where(ProjectFileLink.file_id.in_(ids)))
                 db.commit()
 
             for path in paths_to_create:
-                file = db.exec(select(File).where(File.path == path)).first()
-                if not file:
-                    file = File(path=path)
-                    db.add(file)
-                    db.commit()
-                    db.refresh(file)
+                file = File(path=path)
+                db.add(file)
+                db.commit()
+                db.refresh(file)
                 link = ProjectFileLink(project_id=project.id, file_id=file.id)
                 db.add(link)
-                db.commit()
 
         db.commit()
         db.refresh(project)
