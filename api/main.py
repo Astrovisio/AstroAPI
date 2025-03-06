@@ -1,16 +1,18 @@
 from fastapi import FastAPI
 import uvicorn
+from contextlib import asynccontextmanager
 
 from api.db import create_db_and_tables
 from api.routes.projects import router as projects_router
 
 
-app = FastAPI()
-
-
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     create_db_and_tables()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/api/health")

@@ -29,7 +29,7 @@ def create_new_project(*, session: SessionDep, project: ProjectCreate):
         confs_db.append(conf_db)
     conf_read = crud_config_process._build_config_process_read(confs_db)
 
-    project_read = ProjectRead.from_orm(project)
+    project_read = ProjectRead.model_validate(project)
     project_read.paths = [file.path for file in project.files]
     project_read.config_process = conf_read
 
@@ -59,7 +59,7 @@ def update_project(*, session: SessionDep, project_id: int, project: ProjectUpda
             new_confs_db.append(conf_db)
         conf_read = crud_config_process._build_config_process_read(new_confs_db)
 
-    project_read = ProjectRead.from_orm(project_db)
+    project_read = ProjectRead.model_validate(project_db)
     project_read.paths = [file.path for file in project_db.files]
     project_read.config_process = conf_read
     return project_read

@@ -3,7 +3,7 @@ from typing import Generator, Annotated
 from fastapi import Depends, HTTPException
 from sqlmodel import Session, SQLModel, create_engine
 
-DATABASE_URL = "sqlite:///./test.db"
+DATABASE_URL = "sqlite:///./prod.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 

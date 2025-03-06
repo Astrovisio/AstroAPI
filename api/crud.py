@@ -31,7 +31,7 @@ class CRUDConfigProcess:
     def create_config_process(
         self, db: SessionDep, config_create: ConfigProcessCreate, project_id: int
     ) -> ConfigProcess:
-        config = ConfigProcess.from_orm(config_create)
+        config = ConfigProcess.model_validate(config_create)
         config.project_id = project_id
         db.add(config)
         db.commit()
@@ -86,11 +86,11 @@ class CRUDConfigRender:
         config_create.thr_min = config_process.thr_min
         config_create.thr_max = config_process.thr_max
 
-        config = ConfigRender.from_orm(config_create)
+        config = ConfigRender.model_validate(config_create)
         db.add(config)
         db.commit()
         db.refresh(config)
-        return ConfigRenderRead.from_orm(config)
+        return ConfigRenderRead.model_validate(config)
 
 
 crud_config_process = CRUDConfigProcess()
@@ -103,14 +103,14 @@ class CRUDProject:
         project_reads = []
         for project in projects:
             config_process = crud_config_process.get_config_process(db, project.id)
-            project_read = ProjectRead.from_orm(project)
+            project_read = ProjectRead.model_validate(project)
             project_read.paths = [file.path for file in project.files]
             project_read.config_process = config_process
             project_reads.append(project_read)
         return project_reads
 
     def create_project(self, db: SessionDep, project_create: ProjectCreate) -> Project:
-        project = Project.from_orm(project_create)
+        project = Project.model_validate(project_create)
         db.add(project)
 
         for path in project_create.paths:
@@ -135,7 +135,7 @@ class CRUDProject:
         db.add(project)
         db.commit()
         config_process = crud_config_process.get_config_process(db, project.id)
-        project_read = ProjectRead.from_orm(project)
+        project_read = ProjectRead.model_validate(project)
         project_read.paths = [file.path for file in project.files]
         project_read.config_process = config_process
         return project_read
