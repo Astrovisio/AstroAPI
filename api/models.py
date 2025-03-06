@@ -1,6 +1,38 @@
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
+
+
+class VariableConfig(SQLModel):
+    thr_min: float
+    thr_max: float
+    selected: bool
+    x_axis: bool
+    y_axis: bool
+    z_axis: bool
+
+
+class ConfigProcessBase(VariableConfig):
+    var_name: str
+    downsampling: float
+
+
+class ConfigProcess(ConfigProcessBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: Optional[int] = Field(default=None, foreign_key="project.id")
+
+
+class ConfigProcessCreate(ConfigProcessBase):
+    pass
+
+
+class ConfigProcessRead(SQLModel):
+    downsampling: float
+    variables: Dict[str, VariableConfig]
+
+
+# ----------------------------
+# ----------------------------
 
 
 class ProjectFileLink(SQLModel, table=True):
@@ -44,38 +76,11 @@ class ProjectRead(ProjectBase):
     created: datetime
     last_opened: Optional[datetime]
     paths: List[str] = []
+    config_process: ConfigProcessRead = None
 
 
 class ProjectUpdate(ProjectBase):
     paths: List[str] = []
-
-
-# ----------------------------
-# ----------------------------
-
-
-class ConfigProcessBase(SQLModel):
-    project_id: int
-    var_name: str
-    thr_min: float
-    thr_max: float
-    selected: bool
-    downsampling: float
-    x_axis: bool
-    y_axis: bool
-    z_axis: bool
-
-
-class ConfigProcess(ConfigProcessBase, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-
-
-class ConfigProcessCreate(ConfigProcessBase):
-    pass
-
-
-class ConfigProcessRead(ConfigProcessBase):
-    id: int
 
 
 # ----------------------------
