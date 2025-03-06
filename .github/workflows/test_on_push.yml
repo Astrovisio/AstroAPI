@@ -1,8 +1,9 @@
 name: AstroAPI tests
 run-name: ${{ github.actor }} is testing code automatically
+on: [push]
 
 jobs:
-  uv-example:
+  unit-tests:
     name: python
     runs-on: ubuntu-latest
 
