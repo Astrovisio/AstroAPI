@@ -169,7 +169,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-test.db
+*.db
 
 test.py
 .files
