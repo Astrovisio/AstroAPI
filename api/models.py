@@ -4,18 +4,17 @@ from typing import Optional, List, Dict
 
 
 class VariableConfig(SQLModel):
-    thr_min: float
-    thr_max: float
-    selected: bool
+    thr_min: float = -float("inf")
+    thr_max: float = float("inf")
+    selected: bool = False
     unit: str
-    x_axis: bool
-    y_axis: bool
-    z_axis: bool
+    x_axis: bool = False
+    y_axis: bool = False
+    z_axis: bool = False
 
 
 class ConfigProcessBase(VariableConfig):
-    var_name: str
-    downsampling: float
+    downsampling: float = 0
 
 
 class ConfigProcess(ConfigProcessBase, table=True):
