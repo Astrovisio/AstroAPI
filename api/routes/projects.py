@@ -9,7 +9,7 @@ from api.models import (
 )
 from api.crud import crud_project, crud_config_process, crud_config_render
 from api.db import SessionDep
-from api.utils import read_data
+from api.utils import read_data, process_data
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -74,9 +74,10 @@ def remove_project(*, session: SessionDep, project_id: int):
 
 
 @router.post("/{project_id}/process")
-def process_data(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
-    config.project_id = project_id
-    return crud_config_process.create_config_process(session, config)
+def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
+    paths = crud_project.get_project(session, project_id).paths
+    paths_processed = process_data(paths, config)
+    return {"message": "Data processed successfully", "paths": paths_processed}
 
 
 # @router.post("/{project_id}/render")

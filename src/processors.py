@@ -75,9 +75,11 @@ def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFram
         if var_config.selected:
             # Filter the DataFrame based on the specified thresholds
             filtered_df = filtered_df[
-                (filtered_df[var_name] >= var_config.thr_min)
-                & (filtered_df[var_name] <= var_config.thr_max)
+                (filtered_df[var_name] >= var_config.thr_min_sel)
+                & (filtered_df[var_name] <= var_config.thr_max_sel)
             ]
+        else:
+            filtered_df.drop(columns=[var_name], inplace=True)
 
     return filtered_df
 
