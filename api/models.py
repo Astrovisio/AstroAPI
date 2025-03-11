@@ -5,7 +5,9 @@ from typing import Optional, List, Dict
 
 class VariableConfig(SQLModel):
     thr_min: float = -float("inf")
+    thr_min_sel: Optional[float] = None
     thr_max: float = float("inf")
+    thr_max_sel: Optional[float] = None
     selected: bool = False
     unit: str
     x_axis: bool = False
@@ -18,18 +20,35 @@ class ConfigProcessBase(VariableConfig):
     downsampling: float = 1
 
 
+class ConfigFileLink(SQLModel, table=True):
+    config_id: Optional[int] = Field(
+        default=None, foreign_key="configprocess.id", primary_key=True
+    )
+    file_id: Optional[int] = Field(
+        default=None, foreign_key="file.id", primary_key=True
+    )
+
+
 class ConfigProcess(ConfigProcessBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: Optional[int] = Field(default=None, foreign_key="project.id")
+
+    files: List["File"] = Relationship(
+        back_populates="config_processes", link_model=ConfigFileLink
+    )
 
 
 class ConfigProcessCreate(ConfigProcessBase):
     pass
 
 
+class VariableConfigRead(VariableConfig):
+    files: Optional[List[str]] = []
+
+
 class ConfigProcessRead(SQLModel):
     downsampling: float
-    variables: Dict[str, VariableConfig]
+    variables: Dict[str, VariableConfigRead]
 
 
 # ----------------------------
@@ -48,8 +67,12 @@ class ProjectFileLink(SQLModel, table=True):
 class File(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     path: str
+
     projects: List["Project"] = Relationship(
         back_populates="files", link_model=ProjectFileLink
+    )
+    config_processes: List[ConfigProcess] = Relationship(
+        back_populates="files", link_model=ConfigFileLink
     )
 
 
