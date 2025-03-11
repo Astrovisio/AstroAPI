@@ -14,7 +14,8 @@ class VariableConfig(SQLModel):
 
 
 class ConfigProcessBase(VariableConfig):
-    downsampling: float = 0
+    var_name: str
+    downsampling: float = 1
 
 
 class ConfigProcess(ConfigProcessBase, table=True):

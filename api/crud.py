@@ -50,14 +50,7 @@ class CRUDConfigProcess:
         self, config_processes: List[ConfigProcess]
     ) -> ConfigProcessRead:
         variables = {
-            config.var_name: VariableConfig(
-                thr_min=config.thr_min,
-                thr_max=config.thr_max,
-                selected=config.selected,
-                x_axis=config.x_axis,
-                y_axis=config.y_axis,
-                z_axis=config.z_axis,
-            )
+            config.var_name: VariableConfig(**config.model_dump())
             for config in config_processes
         }
 
@@ -195,6 +188,7 @@ class CRUDProject:
             )
         ).all()
         db.exec(delete(File).where(File.id.in_(file_ids)))
+        db.exec(delete(ProjectFileLink).where(ProjectFileLink.project_id == project_id))
         db.exec(delete(ConfigProcess).where(ConfigProcess.project_id == project_id))
         db.delete(project)
         db.commit()

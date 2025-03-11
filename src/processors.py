@@ -15,7 +15,7 @@ def fits_to_dataframe(path):
     # Extract velocity, RA, and Dec from the world coordinates
     velo = world_coords[0].value
     dec = world_coords[1].value
-    ra = world_coords[2].value    
+    ra = world_coords[2].value
 
     # Flatten the data and coordinates
     data_flat = cube.filled_data[:].value.flatten()
@@ -72,17 +72,17 @@ def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFram
 
     # Apply the filtering for each variable in the config
     for var_name, var_config in config.variables.items():
-        if var_config.selected:           
+        if var_config.selected:
             # Filter the DataFrame based on the specified thresholds
             filtered_df = filtered_df[
-                (filtered_df[var_name] >= var_config.thr_min) &
-                (filtered_df[var_name] <= var_config.thr_max)
+                (filtered_df[var_name] >= var_config.thr_min)
+                & (filtered_df[var_name] <= var_config.thr_max)
             ]
 
     return filtered_df
 
 
-def convertToDataframe(path, config=None) -> pd.DataFrame: #Maybe needs a better name
+def convertToDataframe(path, config=None) -> pd.DataFrame:  # Maybe needs a better name
 
     if getFileType(path) == "fits":
         df = fits_to_dataframe(path)
