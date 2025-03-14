@@ -1,7 +1,7 @@
 import pynbody
 from src.loaders import loadSimulation, loadObservation
 from src.utils import getFileType
-from api.models import VariableConfig
+from api.models import VariableConfig, VariableConfigRead
 from spectral_cube import SpectralCube
 from typing import List, Dict
 import numpy as np
@@ -21,7 +21,7 @@ def getKeys(path: str) -> list:
         return keys
 
 
-def getThresholds(path: str) -> Dict[str, VariableConfig]:
+def getThresholds(path: str) -> Dict[str, VariableConfigRead]:
 
     res = {}
 
@@ -58,15 +58,11 @@ def getThresholds(path: str) -> Dict[str, VariableConfig]:
         sim.physical_units()
 
         for key in ["x", "y", "z"] + sim.loadable_keys():
-            try:
-                res[key] = VariableConfig(
+                res[key] = VariableConfigRead(
                     thr_min=float(sim[key].min()),
                     thr_max=float(sim[key].max()),
                     unit=str(sim[key].units),
                 )
-
-            except (KeyError, pynbody.units.UnitsException):
-                pass
 
         del sim
 

@@ -64,9 +64,7 @@ def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFram
     for var_name, var_config in config.variables.items():
 
         if var_config.selected:
-
             # Filter the DataFrame based on the specified thresholds
-
             filtered_df = filtered_df[
                 (filtered_df[var_name] >= var_config.thr_min)
                 & (filtered_df[var_name] <= var_config.thr_max)
@@ -80,7 +78,7 @@ def convertToDataframe(
 ) -> pd.DataFrame:  # Maybe needs a better name
 
     if getFileType(path) == "fits":
-        df = fits_to_dataframe(path)
+        df = fits_to_dataframe(path) # When we load an observation since the available data will always be just "x,y,z,intensity" it's meaningless to drop unused axes, we always need all 4
 
     else:
         df = pynbody_to_dataframe(path, config)
