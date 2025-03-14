@@ -3,7 +3,7 @@ from spectral_cube import SpectralCube
 from src.utils import getFileType
 
 
-def loadSimulation(path: str) -> pynbody.snapshot:
+def loadSimulation(path: str) -> pynbody.snapshot.SimSnap:
 
     sim = pynbody.load(path)
 

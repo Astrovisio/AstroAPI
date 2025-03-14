@@ -23,7 +23,6 @@ def fits_to_dataframe(path):
     ra_flat = ra.flatten()
     dec_flat = dec.flatten()
 
-    # Create a DataFrame
     df = pd.DataFrame(
         {"velocity": velo_flat, "ra": ra_flat, "dec": dec_flat, "intensity": data_flat}
     )
@@ -37,28 +36,21 @@ def fits_to_dataframe(path):
 
 def pynbody_to_dataframe(file, config: ConfigProcessRead):
 
-    # Load the simulation file
     sim = pynbody.load(file)
 
-    # Ensure the simulation is in physical units
     sim.physical_units()
 
-    # Default keys to always include
     keys = ["x", "y", "z"]
 
-    # Combine default keys with requested keys
     for key, value in config.variables.items():
         if value.selected:
             keys = keys + [key]
 
-    # Initialize dictionary to store data
     data = {}
 
-    # Extract each key's data
     for key in keys:
-        data[key] = sim[key].astype(float)  # Convert to float for DataFrame
+        data[key] = sim[key].astype(float)
 
-    # Create a DataFrame
     df = pd.DataFrame(data)
 
     del sim
@@ -67,24 +59,25 @@ def pynbody_to_dataframe(file, config: ConfigProcessRead):
 
 
 def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFrame:
-    # Start with the original DataFrame
     filtered_df = df.copy()
 
-    # Apply the filtering for each variable in the config
     for var_name, var_config in config.variables.items():
+
         if var_config.selected:
+
             # Filter the DataFrame based on the specified thresholds
+
             filtered_df = filtered_df[
-                (filtered_df[var_name] >= var_config.thr_min_sel)
-                & (filtered_df[var_name] <= var_config.thr_max_sel)
+                (filtered_df[var_name] >= var_config.thr_min)
+                & (filtered_df[var_name] <= var_config.thr_max)
             ]
-        else:
-            filtered_df.drop(columns=[var_name], inplace=True)
 
     return filtered_df
 
 
-def convertToDataframe(path, config=None) -> pd.DataFrame:  # Maybe needs a better name
+def convertToDataframe(
+    path, config: ConfigProcessRead
+) -> pd.DataFrame:  # Maybe needs a better name
 
     if getFileType(path) == "fits":
         df = fits_to_dataframe(path)
