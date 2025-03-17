@@ -6,14 +6,21 @@ from spectral_cube import SpectralCube
 from typing import List, Dict
 import numpy as np
 
+def getSimFamily(path: str) -> List[str]:
+    
+    sim = loadSimulation(path)
+    families = [str(el) for el in sim.families()]
+    
+    return families
 
-def getKeys(path: str) -> list:
+
+def getKeys(path: str, family=None) -> list:
 
     if getFileType(path) == "fits":
         return ["ra", "dec", "velocity", "intensity"]
 
     else:
-        sim = loadSimulation(path)
+        sim = loadSimulation(path, family)
         keys = sim.loadable_keys()
         keys = ["x", "y", "z"] + keys
         del sim
@@ -21,7 +28,7 @@ def getKeys(path: str) -> list:
         return keys
 
 
-def getThresholds(path: str) -> Dict[str, VariableConfigRead]:
+def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
 
     res = {}
 
@@ -54,7 +61,7 @@ def getThresholds(path: str) -> Dict[str, VariableConfigRead]:
         del cube
 
     else:
-        sim = loadSimulation(path)
+        sim = loadSimulation(path, family)
         sim.physical_units()
 
         for key in ["x", "y", "z"] + sim.loadable_keys():

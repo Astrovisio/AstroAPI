@@ -2,12 +2,13 @@ import pandas as pd
 from spectral_cube import SpectralCube
 from api.models import ConfigProcessRead
 from src.utils import getFileType
+from src.loaders import loadObservation, loadSimulation
 import pynbody
 
 
 def fits_to_dataframe(path):
     # Load the spectral cube
-    cube = SpectralCube.read(path)
+    cube = loadObservation(path)
 
     # Get the world coordinates for each pixel
     world_coords = cube.world[:, :, :]
@@ -34,9 +35,9 @@ def fits_to_dataframe(path):
     return df
 
 
-def pynbody_to_dataframe(file, config: ConfigProcessRead):
+def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
 
-    sim = pynbody.load(file)
+    sim = loadSimulation(path, family)
 
     sim.physical_units()
 
@@ -74,13 +75,15 @@ def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFram
 
 
 def convertToDataframe(
-    path, config: ConfigProcessRead
+    path, config: ConfigProcessRead, family=None
 ) -> pd.DataFrame:  # Maybe needs a better name
 
     if getFileType(path) == "fits":
-        df = fits_to_dataframe(path) # When we load an observation since the available data will always be just "x,y,z,intensity" it's meaningless to drop unused axes, we always need all 4
+        df = fits_to_dataframe(
+            path
+        )  # When we load an observation since the available data will always be just "x,y,z,intensity" it's meaningless to drop unused axes, we always need all 4
 
     else:
-        df = pynbody_to_dataframe(path, config)
+        df = pynbody_to_dataframe(path, config, family)
 
     return filter_dataframe(df, config)
