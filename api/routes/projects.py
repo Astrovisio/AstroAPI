@@ -4,12 +4,12 @@ from api.models import (
     ProjectCreate,
     ProjectUpdate,
     ProjectRead,
-    ConfigProcess,
+    ConfigProcessRead,
     ConfigRender,
 )
 from api.crud import crud_project, crud_config_process, crud_config_render
 from api.db import SessionDep
-from api.utils import read_data
+from api.utils import read_data, process_data
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -23,11 +23,13 @@ def read_projects(*, session: SessionDep):
 def create_new_project(*, session: SessionDep, project: ProjectCreate):
     project = crud_project.create_project(session, project)
     confs = read_data(project.files)
-    confs_db = []
-    for conf in confs:
-        conf_db = crud_config_process.create_config_process(session, conf, project.id)
-        confs_db.append(conf_db)
-    conf_read = crud_config_process._build_config_process_read(confs_db)
+    for file, vars in confs.items():
+        for var_name, conf in vars.items():
+            conf_db = crud_config_process.create_config_process(
+                session, conf, project.id
+            )
+            crud_config_process.associate_config_file(session, conf_db.id, file)
+    conf_read = crud_config_process._build_config_process_read(session, project.id)
 
     project_read = ProjectRead.model_validate(project)
     project_read.paths = [file.path for file in project.files]
@@ -52,12 +54,14 @@ def update_project(*, session: SessionDep, project_id: int, project: ProjectUpda
     if "paths" in project.model_dump(exclude_unset=True):
         confs = read_data(project_db.files)
         crud_config_process.delete_config_process(session, project_id)
-        for conf in confs:
-            conf_db = crud_config_process.create_config_process(
-                session, conf, project_id
-            )
-            new_confs_db.append(conf_db)
-        conf_read = crud_config_process._build_config_process_read(new_confs_db)
+        for file, vars in confs.items():
+            for var_name, conf in vars.items():
+
+                conf_db = crud_config_process.create_config_process(
+                    session, conf, project_id
+                )
+                crud_config_process.associate_config_file(session, conf_db.id, file)
+    conf_read = crud_config_process._build_config_process_read(session, project_id)
 
     project_read = ProjectRead.model_validate(project_db)
     project_read.paths = [file.path for file in project_db.files]
@@ -72,12 +76,13 @@ def remove_project(*, session: SessionDep, project_id: int):
 
 
 @router.post("/{project_id}/process")
-def process_data(*, session: SessionDep, project_id: int, config: ConfigProcess):
-    config.project_id = project_id
-    return crud_config_process.create_config_process(session, config)
+def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
+    paths = crud_project.get_project(session, project_id).paths
+    path_processed = process_data(paths, config)
+    return {"message": "Data processed successfully", "path": path_processed}
 
 
-@router.post("/{project_id}/render")
-def create_render_config(*, session: SessionDep, project_id: int, config: ConfigRender):
-    config.project_id = project_id
-    return crud_config_render.create_render(session, config)
+# @router.post("/{project_id}/render")
+# def create_render_config(*, session: SessionDep, project_id: int, config: ConfigRender):
+#     config.project_id = project_id
+#     return crud_config_render.create_render(session, config)

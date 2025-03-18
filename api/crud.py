@@ -10,8 +10,9 @@ from api.models import (
     ProjectRead,
     ProjectUpdate,
     ProjectFileLink,
-    VariableConfig,
+    VariableConfigRead,
     ConfigProcess,
+    ConfigFileLink,
     ConfigProcessCreate,
     ConfigProcessRead,
     ConfigRender,
@@ -23,10 +24,7 @@ from api.db import SessionDep
 
 class CRUDConfigProcess:
     def get_config_process(self, db: SessionDep, project_id: int) -> ConfigProcessRead:
-        config_processes = db.exec(
-            select(ConfigProcess).where(ConfigProcess.project_id == project_id)
-        ).all()
-        return self._build_config_process_read(config_processes)
+        return self._build_config_process_read(db, project_id)
 
     def create_config_process(
         self, db: SessionDep, config_create: ConfigProcessCreate, project_id: int
@@ -46,20 +44,39 @@ class CRUDConfigProcess:
             db.delete(config_process)
         db.commit()
 
+    def associate_config_file(self, db: SessionDep, config_id: int, file_path: str):
+        file = db.exec(select(File).where(File.path == file_path)).first()
+        link = ConfigFileLink(config_id=config_id, file_id=file.id)
+        db.add(link)
+        db.commit()
+
     def _build_config_process_read(
-        self, config_processes: List[ConfigProcess]
+        self, db: SessionDep, project_id: int
     ) -> ConfigProcessRead:
-        variables = {
-            config.var_name: VariableConfig(
-                thr_min=config.thr_min,
-                thr_max=config.thr_max,
-                selected=config.selected,
-                x_axis=config.x_axis,
-                y_axis=config.y_axis,
-                z_axis=config.z_axis,
-            )
-            for config in config_processes
-        }
+
+        config_processes = db.exec(
+            select(ConfigProcess).where(ConfigProcess.project_id == project_id)
+        ).all()
+
+        variables = {}
+        for config in config_processes:
+            if config.var_name not in variables:
+                variables[config.var_name] = VariableConfigRead(**config.model_dump())
+                variables[config.var_name].files = [file.path for file in config.files]
+            else:
+                variables[config.var_name].thr_min = min(
+                    variables[config.var_name].thr_min, config.thr_min
+                )
+                variables[config.var_name].thr_max = max(
+                    variables[config.var_name].thr_max, config.thr_max
+                )
+                variables[config.var_name].files.extend(
+                    [file.path for file in config.files]
+                )
+        # for config in config_processes:
+        #     variables[config.var_name] = VariableConfigRead(**config.model_dump())
+        #     files_paths = [file.path for file in config.files]
+        #     variables[config.var_name].files = files_paths
 
         downsampling = config_processes[0].downsampling if config_processes else 1.0
 
@@ -193,7 +210,12 @@ class CRUDProject:
             )
         ).all()
         db.exec(delete(File).where(File.id.in_(file_ids)))
+        config_ids = db.exec(
+            select(ConfigProcess.id).where(ConfigProcess.project_id == project_id)
+        ).all()
+        db.exec(delete(ProjectFileLink).where(ProjectFileLink.project_id == project_id))
         db.exec(delete(ConfigProcess).where(ConfigProcess.project_id == project_id))
+        db.exec(delete(ConfigFileLink).where(ConfigFileLink.config_id.in_(config_ids)))
         db.delete(project)
         db.commit()
 
