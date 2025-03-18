@@ -33,7 +33,7 @@ class FileVariable(SQLModel):
 class DataProcessor:
     @staticmethod
     def read_data(files: List[File]) -> Dict[str, Dict[str, ConfigProcessCreate]]:
-        if not os.getenv("API_TEST"):
+        if os.getenv("API_TEST"):
             return DataProcessor.read_data_test(files)
 
         config_processes = {}
