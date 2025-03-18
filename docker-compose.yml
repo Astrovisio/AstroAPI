@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    deploy:
+      resources:
+        limits:
+          memory: 500MB
+        reservations:
+          memory: 500MB
+    ports:
+      - "8000:8000"
