@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
-from api.main import app
-from api.db import get_session
 from sqlmodel import Session, SQLModel, create_engine
+
+from api.db import get_session
+from api.main import app
 
 TEST_DATABASE_URL = "sqlite:///test.db"
 

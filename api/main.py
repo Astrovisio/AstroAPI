@@ -1,6 +1,7 @@
-from fastapi import FastAPI
-import uvicorn
 from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import FastAPI
 
 from api.db import create_db_and_tables
 from api.routes.projects import router as projects_router

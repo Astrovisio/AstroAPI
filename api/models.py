@@ -1,6 +1,7 @@
-from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
+
+from sqlmodel import Field, Relationship, SQLModel
 
 
 class VariableConfig(SQLModel):

@@ -1,10 +1,12 @@
-from typing import Dict, List
 import os
-from sqlmodel import SQLModel
 import random
+from typing import Dict, List
+
 import pandas as pd
-from src import gets, processors
+from sqlmodel import SQLModel
+
 from api.models import ConfigProcessCreate, ConfigProcessRead, File
+from src import gets, processors
 
 
 class FileVariable(SQLModel):
