@@ -6,11 +6,12 @@ from spectral_cube import SpectralCube
 from typing import List, Dict
 import numpy as np
 
+
 def getSimFamily(path: str) -> List[str]:
-    
+
     sim = loadSimulation(path)
     families = [str(el) for el in sim.families()]
-    
+
     return families
 
 
@@ -65,11 +66,11 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
         sim.physical_units()
 
         for key in ["x", "y", "z"] + sim.loadable_keys():
-                res[key] = VariableConfigRead(
-                    thr_min=float(sim[key].min()),
-                    thr_max=float(sim[key].max()),
-                    unit=str(sim[key].units),
-                )
+            res[key] = VariableConfigRead(
+                thr_min=float(sim[key].min()),
+                thr_max=float(sim[key].max()),
+                unit=str(sim[key].units),
+            )
 
         del sim
 

@@ -9,7 +9,7 @@ from api.models import (
 )
 from api.crud import crud_project, crud_config_process, crud_config_render
 from api.db import SessionDep
-from api.utils import read_data, process_data
+from api.utils import data_processor
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -22,7 +22,7 @@ def read_projects(*, session: SessionDep):
 @router.post("/", response_model=ProjectRead)
 def create_new_project(*, session: SessionDep, project: ProjectCreate):
     project = crud_project.create_project(session, project)
-    confs = read_data(project.files)
+    confs = data_processor.read_data(project.files)
     for file, vars in confs.items():
         for var_name, conf in vars.items():
             conf_db = crud_config_process.create_config_process(
@@ -49,10 +49,8 @@ def read_project(*, session: SessionDep, project_id: int):
 @router.put("/{project_id}", response_model=ProjectRead)
 def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
     project_db = crud_project.update_project(session, project_id, project)
-    new_confs_db = []
-    conf_read = crud_config_process.get_config_process(session, project_id)
     if "paths" in project.model_dump(exclude_unset=True):
-        confs = read_data(project_db.files)
+        confs = data_processor.read_data(project_db.files)
         crud_config_process.delete_config_process(session, project_id)
         for file, vars in confs.items():
             for var_name, conf in vars.items():
@@ -78,7 +76,7 @@ def remove_project(*, session: SessionDep, project_id: int):
 @router.post("/{project_id}/process")
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
     paths = crud_project.get_project(session, project_id).paths
-    path_processed = process_data(paths, config)
+    path_processed = data_processor.process_data(paths, config)
     return {"message": "Data processed successfully", "path": path_processed}
 
 

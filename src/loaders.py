@@ -4,14 +4,14 @@ from src.utils import getFileType
 
 
 def loadSimulation(path: str, family=None) -> pynbody.snapshot.SimSnap:
-    
+
     if family == None:
         sim = pynbody.load(path)
         sim = getattr(sim, str(sim.families()[0]))
-        
+
     else:
         sim = getattr(pynbody.load(path), family)
-        
+
     return sim
 
 
@@ -29,4 +29,3 @@ def load(path: str):
 
     else:
         return loadSimulation(path)
-

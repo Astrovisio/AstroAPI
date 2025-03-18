@@ -12,6 +12,7 @@ jobs:
       statuses: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      API_TEST: true
       GITHUB_REPOSITORY: ${{ github.repository }}
       GITHUB_SHA: ${{ github.sha }}
       STATUSES_URL: ${{ github.api_url }}/repos/${{ github.repository }}/statuses/${{ github.sha }}
