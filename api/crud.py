@@ -60,9 +60,23 @@ class CRUDConfigProcess:
 
         variables = {}
         for config in config_processes:
-            variables[config.var_name] = VariableConfigRead(**config.model_dump())
-            files_paths = [file.path for file in config.files]
-            variables[config.var_name].files = files_paths
+            if config.var_name not in variables:
+                variables[config.var_name] = VariableConfigRead(**config.model_dump())
+                variables[config.var_name].files = [file.path for file in config.files]
+            else:
+                variables[config.var_name].thr_min = min(
+                    variables[config.var_name].thr_min, config.thr_min
+                )
+                variables[config.var_name].thr_max = max(
+                    variables[config.var_name].thr_max, config.thr_max
+                )
+                variables[config.var_name].files.extend(
+                    [file.path for file in config.files]
+                )
+        # for config in config_processes:
+        #     variables[config.var_name] = VariableConfigRead(**config.model_dump())
+        #     files_paths = [file.path for file in config.files]
+        #     variables[config.var_name].files = files_paths
 
         downsampling = config_processes[0].downsampling if config_processes else 1.0
 

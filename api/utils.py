@@ -17,11 +17,11 @@ def read_data(files: List[File]) -> Dict[str, Dict[str, ConfigProcessCreate]]:
     return config_processes
 
 
-def process_data(paths: List[str], config: ConfigProcessRead) -> pd.DataFrame:
-    processed_paths = []
+def process_data(paths: List[str], config: ConfigProcessRead) -> str:
+    combined_df = pd.DataFrame()
     for path in paths:
         df = processors.convertToDataframe(path, config)
-        new_path = path.split(".")[0] + "_processed.csv"
-        df.to_csv(new_path, index=False)
-        processed_paths.append(new_path)
-    return processed_paths
+        combined_df = pd.concat([combined_df, df], ignore_index=True).drop_duplicates()
+    new_path = "./data/processed.csv"
+    combined_df.to_csv(new_path, index=False)
+    return new_path

@@ -100,7 +100,7 @@ class ProjectRead(ProjectBase):
     created: datetime
     last_opened: Optional[datetime]
     paths: List[str] = []
-    config_process: ConfigProcessRead
+    config_process: ConfigProcessRead = None
 
 
 class ProjectUpdate(ProjectBase):

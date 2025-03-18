@@ -49,17 +49,17 @@ def read_project(*, session: SessionDep, project_id: int):
 @router.put("/{project_id}", response_model=ProjectRead)
 def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
     project_db = crud_project.update_project(session, project_id, project)
-    new_confs_db = []
-    conf_read = crud_config_process.get_config_process(session, project_id)
     if "paths" in project.dict(exclude_unset=True):
         confs = read_data(project_db.files)
         crud_config_process.delete_config_process(session, project_id)
-        for conf in confs:
-            conf_db = crud_config_process.create_config_process(
-                session, conf, project_id
-            )
-            new_confs_db.append(conf_db)
-        conf_read = crud_config_process._build_config_process_read(new_confs_db)
+        for file, vars in confs.items():
+            for var_name, conf in vars.items():
+
+                conf_db = crud_config_process.create_config_process(
+                    session, conf, project_id
+                )
+                crud_config_process.associate_config_file(session, conf_db.id, file)
+    conf_read = crud_config_process._build_config_process_read(session, project_id)
 
     project_read = ProjectRead.model_validate(project_db)
     project_read.paths = [file.path for file in project_db.files]
@@ -76,8 +76,8 @@ def remove_project(*, session: SessionDep, project_id: int):
 @router.post("/{project_id}/process")
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
     paths = crud_project.get_project(session, project_id).paths
-    paths_processed = process_data(paths, config)
-    return {"message": "Data processed successfully", "paths": paths_processed}
+    path_processed = process_data(paths, config)
+    return {"message": "Data processed successfully", "path": path_processed}
 
 
 # @router.post("/{project_id}/render")
