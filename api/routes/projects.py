@@ -1,14 +1,10 @@
-from fastapi import APIRouter, HTTPException
 from typing import List
-from api.models import (
-    ProjectCreate,
-    ProjectUpdate,
-    ProjectRead,
-    ConfigProcessRead,
-    ConfigRender,
-)
-from api.crud import crud_project, crud_config_process, crud_config_render
+
+from fastapi import APIRouter, HTTPException
+
+from api.crud import crud_config_process, crud_project
 from api.db import SessionDep
+from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpdate
 from api.utils import data_processor
 
 router = APIRouter(prefix="/projects", tags=["projects"])

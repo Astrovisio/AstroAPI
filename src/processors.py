@@ -1,9 +1,8 @@
 import pandas as pd
-from spectral_cube import SpectralCube
+
 from api.models import ConfigProcessRead
-from src.utils import getFileType
 from src.loaders import loadObservation, loadSimulation
-import pynbody
+from src.utils import getFileType
 
 
 def fits_to_dataframe(path):

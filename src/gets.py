@@ -1,10 +1,10 @@
-import pynbody
-from src.loaders import loadSimulation, loadObservation
-from src.utils import getFileType
-from api.models import VariableConfig, VariableConfigRead
-from spectral_cube import SpectralCube
-from typing import List, Dict
+from typing import Dict, List
+
 import numpy as np
+
+from api.models import VariableConfig, VariableConfigRead
+from src.loaders import loadObservation, loadSimulation
+from src.utils import getFileType
 
 
 def getSimFamily(path: str) -> List[str]:

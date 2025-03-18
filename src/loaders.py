@@ -1,11 +1,12 @@
 import pynbody
 from spectral_cube import SpectralCube
+
 from src.utils import getFileType
 
 
 def loadSimulation(path: str, family=None) -> pynbody.snapshot.SimSnap:
 
-    if family == None:
+    if family is None:
         sim = pynbody.load(path)
         sim = getattr(sim, str(sim.families()[0]))
 
