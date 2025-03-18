@@ -1,6 +1,7 @@
-from fastapi import FastAPI
-import uvicorn
 from contextlib import asynccontextmanager
+
+import uvicorn
+from fastapi import FastAPI
 
 from api.db import create_db_and_tables
 from api.routes.projects import router as projects_router
@@ -23,4 +24,4 @@ def health():
 app.include_router(projects_router, prefix="/api")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

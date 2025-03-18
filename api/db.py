@@ -1,4 +1,4 @@
-from typing import Generator, Annotated
+from typing import Annotated, Generator
 
 from fastapi import Depends, HTTPException
 from sqlmodel import Session, SQLModel, create_engine

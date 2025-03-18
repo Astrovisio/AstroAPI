@@ -3,7 +3,14 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--filter-files"]
   - repo: https://github.com/pycqa/flake8
     rev: 7.0.0
     hooks:
       - id: flake8
+        args:
+        -   --ignore=E203,E501,W503
