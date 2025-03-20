@@ -1,11 +1,56 @@
 services:
-  api:
+  api-2g:
     build: .
     deploy:
       resources:
         limits:
-          memory: 500MB
+          memory: 2GB
         reservations:
-          memory: 500MB
+          memory: 2GB
+    volumes:
+      - $HOME/astrodata:/app/data
     ports:
       - "8000:8000"
+  api-4g:
+    build: .
+    deploy:
+      resources:
+        limits:
+          memory: 4GB
+        reservations:
+          memory: 4GB
+    volumes:
+      - $HOME/astrodata:/app/data
+    ports:
+      - "8000:8000"
+  api-8g:
+    build: .
+    deploy:
+      resources:
+        limits:
+          memory: 8GB
+        reservations:
+          memory: 8GB
+    volumes:
+      - $HOME/astrodata:/app/data
+    ports:
+      - "8000:8000"
+  api-16g:
+    build: .
+    deploy:
+      resources:
+        limits:
+          memory: 16GB
+        reservations:
+          memory: 16GB
+    volumes:
+      - $HOME/astrodata:/app/data
+    ports:
+      - "8000:8000"
+  api-32g:
+    build: .
+    ports:
+      - "8000:8000"
+
+volumes:
+  astrodata:
