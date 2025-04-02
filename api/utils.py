@@ -61,14 +61,14 @@ class DataProcessor:
         return config_processes
 
     @staticmethod
-    def process_data(paths: List[str], config: ConfigProcessRead) -> str:
+    def process_data(pid: int, paths: List[str], config: ConfigProcessRead) -> str:
         combined_df = pd.DataFrame()
         for path in paths:
             df = processors.convertToDataframe(path, config)
             combined_df = pd.concat(
                 [combined_df, df], ignore_index=True
             ).drop_duplicates()
-        new_path = "./processed.csv"
+        new_path = f"./data/project_{pid}_processed.csv"
         combined_df.to_csv(new_path, index=False)
         return new_path
 

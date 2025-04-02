@@ -72,7 +72,7 @@ def remove_project(*, session: SessionDep, project_id: int):
 @router.post("/{project_id}/process")
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
     paths = crud_project.get_project(session, project_id).paths
-    path_processed = data_processor.process_data(paths, config)
+    path_processed = data_processor.process_data(project_id, paths, config)
     return {"message": "Data processed successfully", "path": path_processed}
 
 
