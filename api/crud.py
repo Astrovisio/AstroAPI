@@ -19,8 +19,8 @@ from api.models import (
     ProjectFileLink,
     ProjectRead,
     ProjectUpdate,
-    VariableConfigRead,
     VariableConfig,
+    VariableConfigRead,
 )
 from api.utils import data_processor
 
