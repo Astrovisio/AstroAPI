@@ -45,16 +45,6 @@ def read_project(*, session: SessionDep, project_id: int):
 @router.put("/{project_id}", response_model=ProjectRead)
 def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
     project_db = crud_project.update_project(session, project_id, project)
-    if "paths" in project.model_dump(exclude_unset=True):
-        confs = data_processor.read_data(project_db.files)
-        crud_config_process.delete_config_process(session, project_id)
-        for file, vars in confs.items():
-            for var_name, conf in vars.items():
-
-                conf_db = crud_config_process.create_config_process(
-                    session, conf, project_id
-                )
-                crud_config_process.associate_config_file(session, conf_db.id, file)
     conf_read = crud_config_process._build_config_process_read(session, project_id)
 
     project_read = ProjectRead.model_validate(project_db)

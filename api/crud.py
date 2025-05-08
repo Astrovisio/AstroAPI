@@ -20,7 +20,9 @@ from api.models import (
     ProjectRead,
     ProjectUpdate,
     VariableConfigRead,
+    VariableConfig,
 )
+from api.utils import data_processor
 
 
 class CRUDConfigProcess:
@@ -74,45 +76,13 @@ class CRUDConfigProcess:
                 variables[config.var_name].files.extend(
                     [file.path for file in config.files]
                 )
-        # for config in config_processes:
-        #     variables[config.var_name] = VariableConfigRead(**config.model_dump())
-        #     files_paths = [file.path for file in config.files]
-        #     variables[config.var_name].files = files_paths
 
         downsampling = config_processes[0].downsampling if config_processes else 1.0
 
         return ConfigProcessRead(downsampling=downsampling, variables=variables)
 
 
-class CRUDConfigRender:
-    def create_render(
-        self, db: SessionDep, config_create: ConfigRenderCreate
-    ) -> ConfigRenderRead:
-        config_process = db.exec(
-            select(ConfigProcess).where(
-                ConfigProcess.project_id == config_create.project_id,
-                ConfigProcess.var_name == config_create.var_name,
-            )
-        ).first()
-
-        if not config_process:
-            raise HTTPException(
-                status_code=404,
-                detail="ConfigProcess not found for the given project_id and var_name",
-            )
-
-        config_create.thr_min = config_process.thr_min
-        config_create.thr_max = config_process.thr_max
-
-        config = ConfigRender.model_validate(config_create)
-        db.add(config)
-        db.commit()
-        db.refresh(config)
-        return ConfigRenderRead.model_validate(config)
-
-
 crud_config_process = CRUDConfigProcess()
-crud_config_render = CRUDConfigRender()
 
 
 class CRUDProject:
@@ -164,13 +134,18 @@ class CRUDProject:
         project = db.get(Project, project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
+        project.last_opened = datetime.utcnow()
 
+        # Update fields that are not paths or config_process
         for key, value in project_update.model_dump(exclude_unset=True).items():
-            if key == "paths":
+            if key == "paths" or key == "config_process":
                 continue
             setattr(project, key, value)
 
-        if "paths" in project_update.model_dump(exclude_unset=True):
+        # Update paths
+        project_paths = [file.path for file in project.files]
+        if project_paths != project_update.paths:
+            print(f"Paths changed: {project_paths} -> {project_update.paths}")
             ids = db.exec(
                 select(ProjectFileLink.file_id).where(
                     ProjectFileLink.project_id == project_id
@@ -197,6 +172,36 @@ class CRUDProject:
                 link = ProjectFileLink(project_id=project.id, file_id=file.id)
                 db.add(link)
 
+            confs = data_processor.read_data(project.files)
+            crud_config_process.delete_config_process(db, project_id)
+            for file, vars in confs.items():
+                for var_name, conf in vars.items():
+
+                    conf_db = crud_config_process.create_config_process(
+                        db, conf, project_id
+                    )
+                    crud_config_process.associate_config_file(db, conf_db.id, file)
+            return project
+
+        # Update config_process
+        project_config_process = crud_config_process.get_config_process(db, project.id)
+        if project_config_process != project_update.config_process:
+            config_processes = db.exec(
+                select(ConfigProcess).where(ConfigProcess.project_id == project_id)
+            ).all()
+
+            for config in config_processes:
+                var_config_update = VariableConfig(
+                    **project_update.config_process.variables.get(
+                        config.var_name
+                    ).model_dump()
+                )
+                for k, v in var_config_update.model_dump().items():
+                    setattr(config, k, v)
+
+                config.downsampling = project_update.config_process.downsampling
+                db.add(config)
+
         db.commit()
         db.refresh(project)
         return project
@@ -222,3 +227,33 @@ class CRUDProject:
 
 
 crud_project = CRUDProject()
+
+
+class CRUDConfigRender:
+    def create_render(
+        self, db: SessionDep, config_create: ConfigRenderCreate
+    ) -> ConfigRenderRead:
+        config_process = db.exec(
+            select(ConfigProcess).where(
+                ConfigProcess.project_id == config_create.project_id,
+                ConfigProcess.var_name == config_create.var_name,
+            )
+        ).first()
+
+        if not config_process:
+            raise HTTPException(
+                status_code=404,
+                detail="ConfigProcess not found for the given project_id and var_name",
+            )
+
+        config_create.thr_min = config_process.thr_min
+        config_create.thr_max = config_process.thr_max
+
+        config = ConfigRender.model_validate(config_create)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+        return ConfigRenderRead.model_validate(config)
+
+
+crud_config_render = CRUDConfigRender()
