@@ -1,6 +1,7 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+import msgpack
+from fastapi import APIRouter, HTTPException, Response
 
 from api.crud import crud_config_process, crud_project
 from api.db import SessionDep
@@ -59,11 +60,19 @@ def remove_project(*, session: SessionDep, project_id: int):
     return {"message": "Project deleted successfully"}
 
 
-@router.post("/{project_id}/process")
+@router.post("/{project_id}/process", response_class=Response)
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
     paths = crud_project.get_project(session, project_id).paths
-    path_processed = data_processor.process_data(project_id, paths, config)
-    return {"message": "Data processed successfully", "path": path_processed}
+    # path_processed = data_processor.process_data(project_id, paths, config)
+    processed_data = data_processor.process_data(project_id, paths, config)
+    data_dict = {
+        "columns": processed_data.columns.tolist(),
+        "rows": processed_data.values.tolist(),
+    }
+    print("Converting data_dict to binary format")
+    binary_data = msgpack.packb(data_dict, use_bin_type=True)
+    print("Binary data size:", len(binary_data))
+    return Response(content=binary_data, media_type="application/octet-stream")
 
 
 # @router.post("/{project_id}/render")
