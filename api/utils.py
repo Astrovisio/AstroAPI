@@ -68,9 +68,9 @@ class DataProcessor:
             combined_df = pd.concat(
                 [combined_df, df], ignore_index=True
             ).drop_duplicates()
+        new_path = f"./data/project_{pid}_processed.csv"
+        combined_df.to_csv(new_path, index=False)
         return combined_df
-        # new_path = f"./data/project_{pid}_processed.csv"
-        # combined_df.to_csv(new_path, index=False)
         # return new_path
 
 

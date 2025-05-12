@@ -85,6 +85,65 @@ class CRUDConfigProcess:
 crud_config_process = CRUDConfigProcess()
 
 
+def update_project_paths(
+    db: SessionDep, project: Project, project_paths: List[str]
+) -> None:
+    ids = db.exec(
+        select(ProjectFileLink.file_id).where(ProjectFileLink.project_id == project.id)
+    ).all()
+    current_paths = {
+        file.path for file in db.exec(select(File).where(File.id.in_(ids))).all()
+    }
+    new_paths = set(project_paths)
+
+    paths_to_delete = current_paths - new_paths
+    paths_to_create = new_paths - current_paths
+    if paths_to_delete:
+        db.exec(delete(File).where(File.path.in_(paths_to_delete)))
+        db.exec(delete(ProjectFileLink).where(ProjectFileLink.file_id.in_(ids)))
+        db.commit()
+
+    for path in paths_to_create:
+        file = File(path=path)
+        db.add(file)
+        db.commit()
+        db.refresh(file)
+        link = ProjectFileLink(project_id=project.id, file_id=file.id)
+        db.add(link)
+
+    confs = data_processor.read_data(project.files)
+    crud_config_process.delete_config_process(db, project.id)
+    for file, vars in confs.items():
+        for var_name, conf in vars.items():
+            conf_db = crud_config_process.create_config_process(db, conf, project.id)
+            crud_config_process.associate_config_file(db, conf_db.id, file)
+
+
+def update_project_config(
+    db: SessionDep, project_id: int, config_process: ConfigProcessRead
+) -> None:
+    config_processes = db.exec(
+        select(ConfigProcess).where(ConfigProcess.project_id == project_id)
+    ).all()
+
+    for config in config_processes:
+        var_config_update = VariableConfig(
+            **config_process.variables.get(config.var_name).model_dump()
+        )
+        for k, v in var_config_update.model_dump().items():
+            if k == "thr_min_sel" and v is not None:
+                if v < config.thr_min:
+                    v = config.thr_min
+            if k == "thr_max_sel" and v is not None:
+                if v > config.thr_max:
+                    v = config.thr_max
+            setattr(config, k, v)
+
+        config.downsampling = config_process.downsampling
+        db.add(config)
+        db.commit()
+
+
 class CRUDProject:
     def get_projects(self, db: SessionDep) -> List[ProjectRead]:
         projects = db.exec(select(Project)).all()
@@ -146,63 +205,14 @@ class CRUDProject:
         project_paths = [file.path for file in project.files]
         if project_paths != project_update.paths:
             print(f"Paths changed: {project_paths} -> {project_update.paths}")
-            ids = db.exec(
-                select(ProjectFileLink.file_id).where(
-                    ProjectFileLink.project_id == project_id
-                )
-            ).all()
-            current_paths = {
-                file.path
-                for file in db.exec(select(File).where(File.id.in_(ids))).all()
-            }
-            new_paths = set(project_update.paths)
-
-            paths_to_delete = current_paths - new_paths
-            paths_to_create = new_paths - current_paths
-            if paths_to_delete:
-                db.exec(delete(File).where(File.path.in_(paths_to_delete)))
-                db.exec(delete(ProjectFileLink).where(ProjectFileLink.file_id.in_(ids)))
-                db.commit()
-
-            for path in paths_to_create:
-                file = File(path=path)
-                db.add(file)
-                db.commit()
-                db.refresh(file)
-                link = ProjectFileLink(project_id=project.id, file_id=file.id)
-                db.add(link)
-
-            confs = data_processor.read_data(project.files)
-            crud_config_process.delete_config_process(db, project_id)
-            for file, vars in confs.items():
-                for var_name, conf in vars.items():
-
-                    conf_db = crud_config_process.create_config_process(
-                        db, conf, project_id
-                    )
-                    crud_config_process.associate_config_file(db, conf_db.id, file)
+            update_project_paths(db, project, project_update.paths)
             return project
 
         # Update config_process
         project_config_process = crud_config_process.get_config_process(db, project.id)
         if project_config_process != project_update.config_process:
-            config_processes = db.exec(
-                select(ConfigProcess).where(ConfigProcess.project_id == project_id)
-            ).all()
+            update_project_config(db, project.id, project_update.config_process)
 
-            for config in config_processes:
-                var_config_update = VariableConfig(
-                    **project_update.config_process.variables.get(
-                        config.var_name
-                    ).model_dump()
-                )
-                for k, v in var_config_update.model_dump().items():
-                    setattr(config, k, v)
-
-                config.downsampling = project_update.config_process.downsampling
-                db.add(config)
-
-        db.commit()
         db.refresh(project)
         return project
 

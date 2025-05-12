@@ -3,7 +3,7 @@ from typing import List
 import msgpack
 from fastapi import APIRouter, HTTPException, Response
 
-from api.crud import crud_config_process, crud_project
+from api.crud import crud_config_process, crud_project, update_project_config
 from api.db import SessionDep
 from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpdate
 from api.utils import data_processor
@@ -63,15 +63,14 @@ def remove_project(*, session: SessionDep, project_id: int):
 @router.post("/{project_id}/process", response_class=Response)
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
     paths = crud_project.get_project(session, project_id).paths
+    update_project_config(session, project_id, config)
     # path_processed = data_processor.process_data(project_id, paths, config)
     processed_data = data_processor.process_data(project_id, paths, config)
     data_dict = {
         "columns": processed_data.columns.tolist(),
         "rows": processed_data.values.tolist(),
     }
-    print("Converting data_dict to binary format")
     binary_data = msgpack.packb(data_dict, use_bin_type=True)
-    print("Binary data size:", len(binary_data))
     return Response(content=binary_data, media_type="application/octet-stream")
 
 
