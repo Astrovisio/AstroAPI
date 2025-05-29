@@ -6,7 +6,8 @@ from src.loaders import loadObservation, loadSimulation
 from src.utils import getFileType
 
 
-def fits_to_dataframe(path):
+def fits_to_dataframe(path, config: ConfigProcessRead):
+
     # Load the spectral cube
     cube = loadObservation(path)
 
@@ -43,7 +44,9 @@ def fits_to_dataframe(path):
     df.dropna(inplace=True)
     del cube
 
-    return df
+    df_sampled = df.sample(frac=config.downsampling)
+
+    return df_sampled
 
 
 def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
@@ -65,9 +68,11 @@ def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
 
     df = pd.DataFrame(data)
 
+    df_sampled = df.sample(frac=config.downsampling)
+
     del sim
 
-    return df
+    return df_sampled
 
 
 def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFrame:
@@ -104,7 +109,7 @@ def convertToDataframe(
 
     if getFileType(path) == "fits":
         df = fits_to_dataframe(
-            path
+            path, config
         )  # When we load an observation since the available data will always be just "x,y,z,intensity" it's meaningless to drop unused axes, we always need all 4
 
     else:
