@@ -43,6 +43,8 @@ class DataProcessor:
             config_processes[file.path] = {}
             variables = gets.getThresholds(file.path)
             for key, value in variables.items():
+                value.thr_min_sel = value.thr_min
+                value.thr_max_sel = value.thr_max
                 config_process = ConfigProcessCreate(
                     downsampling=1, var_name=key, **value.model_dump()
                 )
