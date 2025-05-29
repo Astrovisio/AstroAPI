@@ -76,11 +76,24 @@ def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFram
     for var_name, var_config in config.variables.items():
 
         if var_config.selected:
-            # Filter the DataFrame based on the specified thresholds
-            filtered_df = filtered_df[
-                (filtered_df[var_name] >= var_config.thr_min)
-                & (filtered_df[var_name] <= var_config.thr_max)
-            ]
+            if var_name in ["x", "y", "z"]:
+                print(
+                    f"Filtering {var_name} with thresholds {var_config.thr_min_sel} and {var_config.thr_max_sel}"
+                )
+                # Filter the DataFrame based on the specified thresholds
+                filtered_df = filtered_df[
+                    (filtered_df[var_name] >= var_config.thr_min_sel)
+                    & (filtered_df[var_name] <= var_config.thr_max_sel)
+                ]
+            else:
+                print(
+                    f"Setting {var_name} values to 0 if outside thresholds {var_config.thr_min_sel} and {var_config.thr_max_sel}"
+                )
+                filtered_df.loc[
+                    (filtered_df[var_name] < var_config.thr_min_sel)
+                    | (filtered_df[var_name] > var_config.thr_max_sel),
+                    var_name,
+                ] = 0
 
     return filtered_df
 

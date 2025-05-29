@@ -106,6 +106,7 @@ class ProjectRead(ProjectBase):
 
 class ProjectUpdate(ProjectBase):
     paths: List[str] = []
+    config_process: ConfigProcessRead = None
 
 
 # ----------------------------

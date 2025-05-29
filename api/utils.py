@@ -70,7 +70,8 @@ class DataProcessor:
             ).drop_duplicates()
         new_path = f"./data/project_{pid}_processed.csv"
         combined_df.to_csv(new_path, index=False)
-        return new_path
+        return combined_df
+        # return new_path
 
 
 data_processor = DataProcessor()
