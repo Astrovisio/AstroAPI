@@ -5,11 +5,23 @@ from fastapi import HTTPException
 from sqlmodel import delete, select
 
 from api.db import SessionDep
-from api.models import (ConfigFileLink, ConfigProcess, ConfigProcessCreate,
-                        ConfigProcessRead, ConfigRender, ConfigRenderCreate,
-                        ConfigRenderRead, File, Project, ProjectCreate,
-                        ProjectFileLink, ProjectRead, ProjectUpdate,
-                        VariableConfig, VariableConfigRead)
+from api.models import (
+    ConfigFileLink,
+    ConfigProcess,
+    ConfigProcessCreate,
+    ConfigProcessRead,
+    ConfigRender,
+    ConfigRenderCreate,
+    ConfigRenderRead,
+    File,
+    Project,
+    ProjectCreate,
+    ProjectFileLink,
+    ProjectRead,
+    ProjectUpdate,
+    VariableConfig,
+    VariableConfigRead,
+)
 from api.utils import data_processor
 
 
@@ -188,6 +200,9 @@ class CRUDProject:
             if key == "paths" or key == "config_process":
                 continue
             setattr(project, key, value)
+        db.add(project)
+        db.commit()
+        db.refresh(project)
 
         # Update paths
         project_paths = [file.path for file in project.files]
