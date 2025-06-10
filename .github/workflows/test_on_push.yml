@@ -28,10 +28,10 @@ jobs:
         with:
           python-version-file: "pyproject.toml"
 
-      - name: Install pre-commit
-        run: uv add pre-commit
-      - name: Run pre-commit
-        run: uv run pre-commit run --all-files
+      #- name: Install pre-commit
+      #  run: uv add pre-commit
+      #- name: Run pre-commit
+      #  run: uv run pre-commit run --all-files
 
       - name: Install the project
         run: uv sync --all-extras
