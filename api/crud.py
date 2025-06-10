@@ -5,24 +5,11 @@ from fastapi import HTTPException
 from sqlmodel import delete, select
 
 from api.db import SessionDep
-from api.models import (
-    ConfigFileLink,
-    ConfigProcess,
-    ConfigProcessCreate,
-    ConfigProcessRead,
-    ConfigRender,
-    ConfigRenderCreate,
-    ConfigRenderRead,
-    File,
-    Project,
-    ProjectCreate,
-    ProjectFileLink,
-    ProjectRead,
-    ProjectUpdate,
-    VariableConfig,
-    VariableConfigRead,
-)
-from api.utils import data_processor
+from api.models import (ConfigFileLink, ConfigProcess, ConfigProcessCreate,
+                        ConfigProcessRead, ConfigRender, ConfigRenderCreate,
+                        ConfigRenderRead, File, Project, ProjectCreate,
+                        ProjectFileLink, ProjectRead, ProjectUpdate,
+                        VariableConfigRead)
 
 
 class CRUDConfigProcess:

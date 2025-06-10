@@ -4,6 +4,7 @@ import numpy as np
 
 from api.models import VariableConfig, VariableConfigRead
 from src.loaders import loadObservation, loadSimulation
+from src.processors import fits_to_dataframe
 from src.utils import getFileType
 
 
@@ -23,7 +24,6 @@ def getKeys(path: str, family=None) -> list:
     else:
         sim = loadSimulation(path, family)
         keys = sim.loadable_keys()
-        keys = ["x", "y", "z"] + keys
         del sim
 
         return keys
@@ -35,28 +35,27 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
 
     if getFileType(path) == "fits":
 
-        cube = loadObservation(path)
-        velo, dec, ra = cube.world[:, :, :]
+        cube = fits_to_dataframe(path)
 
         res["ra"] = VariableConfig(
-            thr_min=float(ra.min().value),
-            thr_max=float(ra.max().value),
-            unit=str(ra.unit),
+            thr_min=float(cube["ra"].min()),
+            thr_max=float(cube["ra"].max()),
+            unit="deg",
         )
         res["dec"] = VariableConfig(
-            thr_min=float(dec.min().value),
-            thr_max=float(dec.max().value),
-            unit=str(dec.unit),
+            thr_min=float(cube["dec"].min()),
+            thr_max=float(cube["dec"].max()),
+            unit="deg",
         )
         res["velocity"] = VariableConfig(
-            thr_min=float(velo.min().value),
-            thr_max=float(velo.max().value),
-            unit=str(velo.unit),
+            thr_min=float(cube["velocity"].min()),
+            thr_max=float(cube["velocity"].max()),
+            unit="m / s",
         )
         res["intensity"] = VariableConfig(
-            thr_min=float(np.nanmin(cube.unmasked_data[:].value)),
-            thr_max=float(np.nanmax(cube.unmasked_data[:].value)),
-            unit=str(cube.unmasked_data[:].unit),
+            thr_min=float(cube["intensity"].min()),
+            thr_max=float(cube["intensity"].max()),
+            unit="K",
         )
 
         del cube
@@ -65,12 +64,23 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
         sim = loadSimulation(path, family)
         sim.physical_units()
 
-        for key in ["x", "y", "z"] + sim.loadable_keys():
-            res[key] = VariableConfigRead(
-                thr_min=float(sim[key].min()),
-                thr_max=float(sim[key].max()),
-                unit=str(sim[key].units),
-            )
+        keys = sim.loadable_keys() + ["x", "y", "z"]
+        keys.remove("pos")
+
+        for key in keys:
+            if sim[key].ndim > 1:
+                for i in range(sim[key].shape[1]):
+                    res[f"{key}-{i}"] = VariableConfigRead(
+                        thr_min=float(sim[key][:, i].min()),
+                        thr_max=float(sim[key][:, i].max()),
+                        unit=str(sim[key].units),
+                    )
+            else:
+                res[key] = VariableConfigRead(
+                    thr_min=float(sim[key].min()),
+                    thr_max=float(sim[key].max()),
+                    unit=str(sim[key].units),
+                )
 
         del sim
 

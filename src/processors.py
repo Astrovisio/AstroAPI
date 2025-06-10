@@ -55,16 +55,16 @@ def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
 
     sim.physical_units()
 
-    keys = ["x", "y", "z"]
+    data = {}
 
     for key, value in config.variables.items():
         if value.selected:
-            keys = keys + [key]
+            if "-" in key:
+                key, i = key.split("-")
+                data[f"{key}-{i}"] = sim[key][:, int(i)].astype(float)
 
-    data = {}
-
-    for key in keys:
-        data[key] = sim[key].astype(float)
+            else:
+                data[key] = sim[key].astype(float)
 
     df = pd.DataFrame(data)
 
