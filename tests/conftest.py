@@ -34,7 +34,7 @@ def new_project():
         "name": "Test Project",
         "favourite": True,
         "description": "A test project",
-        "paths": ["file1", "file2"],
+        "paths": ["file1.hdf5", "file2.hdf5"],
     }
 
 

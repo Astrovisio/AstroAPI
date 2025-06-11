@@ -8,7 +8,7 @@ def test_create_new_project(client: TestClient, new_project: dict):
 
     assert data["name"] == "Test Project"
     assert data["description"] == "A test project"
-    assert data["paths"] == ["file1", "file2"]
+    assert data["paths"] == ["file1.hdf5", "file2.hdf5"]
     assert "config_process" in data.keys()
     assert "downsampling" in data["config_process"].keys()
     assert "variables" in data["config_process"].keys()
@@ -36,13 +36,13 @@ def test_update_project(client: TestClient):
     response = client.get("/api/projects/")
     data = response.json()
     project_id = data[0]["id"]
-    update_data = {"name": "Updated Project", "paths": ["file3", "file4"]}
+    update_data = {"name": "Updated Project", "paths": ["file3.fits", "file4.fits"]}
     response = client.put(f"/api/projects/{project_id}", json=update_data)
     assert response.status_code == 200
     data = response.json()
 
     assert data["name"] == "Updated Project"
-    assert set(data["paths"]) == set(["file3", "file4"])
+    assert set(data["paths"]) == set(["file3.fits", "file4.fits"])
 
 
 def test_delete_project(client: TestClient):
