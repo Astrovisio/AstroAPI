@@ -45,3 +45,43 @@ def cleanup_database():
 
     if os.path.exists("test.db"):
         os.remove("test.db")
+
+
+@pytest.fixture
+def invalid_extension_project():
+    return {
+        "name": "Invalid Extension Project",
+        "favourite": False,
+        "description": "Project with invalid file extensions",
+        "paths": ["file1.txt", "file2.csv", "file3.hdf5"],
+    }
+
+
+@pytest.fixture
+def mixed_file_types_project():
+    return {
+        "name": "Mixed File Types Project",
+        "favourite": False,
+        "description": "Project with mixed file types",
+        "paths": ["file1.hdf5", "file2.fits"],
+    }
+
+
+@pytest.fixture
+def valid_hdf5_project():
+    return {
+        "name": "Valid HDF5 Project",
+        "favourite": True,
+        "description": "Project with only HDF5 files",
+        "paths": ["file1.hdf5", "file2.hdf5"],
+    }
+
+
+@pytest.fixture
+def valid_fits_project():
+    return {
+        "name": "Valid FITS Project",
+        "favourite": True,
+        "description": "Project with only FITS files",
+        "paths": ["file1.fits", "file2.fits"],
+    }
