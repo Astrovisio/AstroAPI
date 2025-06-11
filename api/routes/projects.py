@@ -1,10 +1,11 @@
 from typing import List
 
 import msgpack
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Response
 
 from api.crud import crud_config_process, crud_project, update_project_config
 from api.db import SessionDep
+from api.exceptions import DataProcessingError, ProjectNotFoundError
 from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpdate
 from api.utils import data_processor
 
@@ -39,7 +40,7 @@ def create_new_project(*, session: SessionDep, project: ProjectCreate):
 def read_project(*, session: SessionDep, project_id: int):
     project = crud_project.get_project(session, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise ProjectNotFoundError(project_id)
     return project
 
 
@@ -62,16 +63,22 @@ def remove_project(*, session: SessionDep, project_id: int):
 
 @router.post("/{project_id}/process", response_class=Response)
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
-    paths = crud_project.get_project(session, project_id).paths
-    update_project_config(session, project_id, config)
-    # path_processed = data_processor.process_data(project_id, paths, config)
-    processed_data = data_processor.process_data(project_id, paths, config)
-    data_dict = {
-        "columns": processed_data.columns.tolist(),
-        "rows": processed_data.values.tolist(),
-    }
-    binary_data = msgpack.packb(data_dict, use_bin_type=True)
-    return Response(content=binary_data, media_type="application/octet-stream")
+    project = crud_project.get_project(session, project_id)
+    if not project:
+        raise ProjectNotFoundError(project_id)
+
+    try:
+        paths = project.paths
+        update_project_config(session, project_id, config)
+        processed_data = data_processor.process_data(project_id, paths, config)
+        data_dict = {
+            "columns": processed_data.columns.tolist(),
+            "rows": processed_data.values.tolist(),
+        }
+        binary_data = msgpack.packb(data_dict, use_bin_type=True)
+        return Response(content=binary_data, media_type="application/octet-stream")
+    except Exception as e:
+        raise DataProcessingError(str(e), {"project_id": project_id})
 
 
 # @router.post("/{project_id}/render")

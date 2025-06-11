@@ -1,10 +1,14 @@
 from datetime import datetime
 from typing import List
 
-from fastapi import HTTPException
 from sqlmodel import delete, select
 
 from api.db import SessionDep
+from api.exceptions import (
+    ConfigProcessNotFoundError,
+    DataProcessingError,
+    ProjectNotFoundError,
+)
 from api.models import (
     ConfigFileLink,
     ConfigProcess,
@@ -111,7 +115,13 @@ def update_project_paths(
         link = ProjectFileLink(project_id=project.id, file_id=file.id)
         db.add(link)
 
-    confs = data_processor.read_data(project.files)
+    try:
+        confs = data_processor.read_data(project.files)
+    except Exception as e:
+        raise DataProcessingError(
+            f"Failed to read data from project files: {str(e)}",
+            {"project_id": project.id, "file_count": len(project.files)},
+        )
     crud_config_process.delete_config_process(db, project.id)
     for file, vars in confs.items():
         for var_name, conf in vars.items():
@@ -177,7 +187,7 @@ class CRUDProject:
     def get_project(self, db: SessionDep, project_id: int) -> ProjectRead:
         project = db.get(Project, project_id)
         if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise ProjectNotFoundError(project_id)
         project.last_opened = datetime.utcnow()
         db.add(project)
         db.commit()
@@ -192,7 +202,7 @@ class CRUDProject:
     ) -> Project:
         project = db.get(Project, project_id)
         if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise ProjectNotFoundError(project_id)
         project.last_opened = datetime.utcnow()
 
         # Update fields that are not paths or config_process
@@ -222,7 +232,7 @@ class CRUDProject:
     def delete_project(self, db: SessionDep, project_id: int):
         project = db.get(Project, project_id)
         if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise ProjectNotFoundError(project_id)
         file_ids = db.exec(
             select(ProjectFileLink.file_id).where(
                 ProjectFileLink.project_id == project_id
@@ -254,11 +264,11 @@ class CRUDConfigRender:
         ).first()
 
         if not config_process:
-            raise HTTPException(
-                status_code=404,
-                detail="ConfigProcess not found for the given project_id and var_name",
+            raise ConfigProcessNotFoundError(
+                config_create.project_id, config_create.var_name
             )
 
+        config_create.thr_min = config_process.thr_min
         config_create.thr_min = config_process.thr_min
         config_create.thr_max = config_process.thr_max
 

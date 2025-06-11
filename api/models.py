@@ -1,6 +1,8 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional
 
+from pydantic import field_validator
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -95,6 +97,33 @@ class Project(ProjectBase, table=True):
 class ProjectCreate(ProjectBase):
     paths: List[str] = []
 
+    @field_validator("paths")
+    @classmethod
+    def validate_file_paths(cls, v: List[str]) -> List[str]:
+        if not v:
+            return v
+
+        from api.exceptions import InvalidFileExtensionError, MixedFileTypesError
+
+        allowed_extensions = {".hdf5", ".fits"}
+        file_extensions = set()
+        invalid_files = []
+
+        for path in v:
+            ext = Path(path).suffix.lower()
+            if ext not in allowed_extensions:
+                invalid_files.append(path)
+            else:
+                file_extensions.add(ext)
+
+        if invalid_files:
+            raise InvalidFileExtensionError(invalid_files, list(allowed_extensions))
+
+        if len(file_extensions) > 1:
+            raise MixedFileTypesError(list(file_extensions))
+
+        return v
+
 
 class ProjectRead(ProjectBase):
     id: int
@@ -107,6 +136,33 @@ class ProjectRead(ProjectBase):
 class ProjectUpdate(ProjectBase):
     paths: List[str] = []
     config_process: ConfigProcessRead = None
+
+    @field_validator("paths")
+    @classmethod
+    def validate_file_paths(cls, v: List[str]) -> List[str]:
+        if not v:
+            return v
+
+        from api.exceptions import InvalidFileExtensionError, MixedFileTypesError
+
+        allowed_extensions = {".hdf5", ".fits"}
+        file_extensions = set()
+        invalid_files = []
+
+        for path in v:
+            ext = Path(path).suffix.lower()
+            if ext not in allowed_extensions:
+                invalid_files.append(path)
+            else:
+                file_extensions.add(ext)
+
+        if invalid_files:
+            raise InvalidFileExtensionError(invalid_files, list(allowed_extensions))
+
+        if len(file_extensions) > 1:
+            raise MixedFileTypesError(list(file_extensions))
+
+        return v
 
 
 # ----------------------------

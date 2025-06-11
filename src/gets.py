@@ -64,7 +64,7 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
         sim = loadSimulation(path, family)
         sim.physical_units()
 
-        keys = sim.loadable_keys() + ["x", "y", "z"]
+        keys = ["x", "y", "z"] + sim.loadable_keys()
         keys.remove("pos")
 
         for key in keys:

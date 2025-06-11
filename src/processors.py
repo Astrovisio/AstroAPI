@@ -6,7 +6,7 @@ from src.loaders import loadObservation, loadSimulation
 from src.utils import getFileType
 
 
-def fits_to_dataframe(path, config: ConfigProcessRead):
+def fits_to_dataframe(path, config: ConfigProcessRead = None):
 
     # Load the spectral cube
     cube = loadObservation(path)
@@ -43,7 +43,8 @@ def fits_to_dataframe(path, config: ConfigProcessRead):
     df = pd.concat(df_list, ignore_index=True)
     df.dropna(inplace=True)
     del cube
-
+    if not config:
+        return df
     df_sampled = df.sample(frac=config.downsampling)
 
     return df_sampled
