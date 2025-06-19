@@ -18,6 +18,7 @@ from api.models import (
     ConfigRenderCreate,
     ConfigRenderRead,
     File,
+    ProcessJob,
     Project,
     ProjectCreate,
     ProjectFileLink,
@@ -217,7 +218,6 @@ class CRUDProject:
         # Update paths
         project_paths = [file.path for file in project.files]
         if project_paths != project_update.paths:
-            print(f"Paths changed: {project_paths} -> {project_update.paths}")
             update_project_paths(db, project, project_update.paths)
             return project
 
@@ -250,6 +250,31 @@ class CRUDProject:
 
 
 crud_project = CRUDProject()
+
+
+class CRUDProcessJob:
+    def create_process_job(self, db: SessionDep, project_id: int) -> ProcessJob:
+        job = ProcessJob(project_id=project_id)
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        return job
+
+    def update_process_job(self, db: SessionDep, job_id: int, **kwargs):
+        job = db.exec(select(ProcessJob).where(ProcessJob.id == job_id)).first()
+        for k, v in kwargs.items():
+            setattr(job, k, v)
+        job.updated_at = datetime.utcnow()
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        return job
+
+    def get_process_job(self, db: SessionDep, job_id: int) -> ProcessJob:
+        return db.exec(select(ProcessJob).where(ProcessJob.id == job_id)).first()
+
+
+crud_process_job = CRUDProcessJob()
 
 
 class CRUDConfigRender:

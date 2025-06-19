@@ -63,15 +63,27 @@ class DataProcessor:
         return config_processes
 
     @staticmethod
-    def process_data(pid: int, paths: List[str], config: ConfigProcessRead) -> str:
+    def process_data(
+        pid: int, paths: List[str], config: ConfigProcessRead, progress_callback=None
+    ) -> str:
         combined_df = pd.DataFrame()
         for path in paths:
-            df = processors.convertToDataframe(path, config)
+            df = processors.convertToDataframe(
+                path, config, progress_callback=progress_callback
+            )
+            if progress_callback:
+                print(f"df has been created for {path}")
+                progress_callback(0.9)
             combined_df = pd.concat(
                 [combined_df, df], ignore_index=True
             ).drop_duplicates()
+            if progress_callback:
+                print(f"DataFrame for {path} has been combined")
+                progress_callback(0.95)
         new_path = f"./data/project_{pid}_processed.csv"
         combined_df.to_csv(new_path, index=False)
+        if progress_callback:
+            progress_callback(1.0)
         return combined_df
         # return new_path
 
