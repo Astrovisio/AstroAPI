@@ -1,0 +1,12 @@
+services:
+  astroapi:
+    image: astroapi:latest
+    container_name: astroapi
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${VOLUME_SOURCE}/astrodata:/app/data
+
+volumes:
+  astrodata:

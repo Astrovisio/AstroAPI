@@ -43,6 +43,8 @@ class DataProcessor:
             config_processes[file.path] = {}
             variables = gets.getThresholds(file.path)
             for key, value in variables.items():
+                value.thr_min_sel = value.thr_min
+                value.thr_max_sel = value.thr_max
                 config_process = ConfigProcessCreate(
                     downsampling=1, var_name=key, **value.model_dump()
                 )
@@ -61,16 +63,17 @@ class DataProcessor:
         return config_processes
 
     @staticmethod
-    def process_data(paths: List[str], config: ConfigProcessRead) -> str:
+    def process_data(pid: int, paths: List[str], config: ConfigProcessRead) -> str:
         combined_df = pd.DataFrame()
         for path in paths:
             df = processors.convertToDataframe(path, config)
             combined_df = pd.concat(
                 [combined_df, df], ignore_index=True
             ).drop_duplicates()
-        new_path = "./processed.csv"
+        new_path = f"./data/project_{pid}_processed.csv"
         combined_df.to_csv(new_path, index=False)
-        return new_path
+        return combined_df
+        # return new_path
 
 
 data_processor = DataProcessor()

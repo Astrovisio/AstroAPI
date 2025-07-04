@@ -1,9 +1,11 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+import msgpack
+from fastapi import APIRouter, Response
 
-from api.crud import crud_config_process, crud_project
+from api.crud import crud_config_process, crud_project, update_project_config
 from api.db import SessionDep
+from api.exceptions import DataProcessingError, ProjectNotFoundError
 from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpdate
 from api.utils import data_processor
 
@@ -38,23 +40,13 @@ def create_new_project(*, session: SessionDep, project: ProjectCreate):
 def read_project(*, session: SessionDep, project_id: int):
     project = crud_project.get_project(session, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise ProjectNotFoundError(project_id)
     return project
 
 
 @router.put("/{project_id}", response_model=ProjectRead)
 def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
     project_db = crud_project.update_project(session, project_id, project)
-    if "paths" in project.model_dump(exclude_unset=True):
-        confs = data_processor.read_data(project_db.files)
-        crud_config_process.delete_config_process(session, project_id)
-        for file, vars in confs.items():
-            for var_name, conf in vars.items():
-
-                conf_db = crud_config_process.create_config_process(
-                    session, conf, project_id
-                )
-                crud_config_process.associate_config_file(session, conf_db.id, file)
     conf_read = crud_config_process._build_config_process_read(session, project_id)
 
     project_read = ProjectRead.model_validate(project_db)
@@ -69,11 +61,24 @@ def remove_project(*, session: SessionDep, project_id: int):
     return {"message": "Project deleted successfully"}
 
 
-@router.post("/{project_id}/process")
+@router.post("/{project_id}/process", response_class=Response)
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
-    paths = crud_project.get_project(session, project_id).paths
-    path_processed = data_processor.process_data(paths, config)
-    return {"message": "Data processed successfully", "path": path_processed}
+    project = crud_project.get_project(session, project_id)
+    if not project:
+        raise ProjectNotFoundError(project_id)
+
+    try:
+        paths = project.paths
+        update_project_config(session, project_id, config)
+        processed_data = data_processor.process_data(project_id, paths, config)
+        data_dict = {
+            "columns": processed_data.columns.tolist(),
+            "rows": processed_data.values.tolist(),
+        }
+        binary_data = msgpack.packb(data_dict, use_bin_type=True)
+        return Response(content=binary_data, media_type="application/octet-stream")
+    except Exception as e:
+        raise DataProcessingError(str(e), {"project_id": project_id})
 
 
 # @router.post("/{project_id}/render")
