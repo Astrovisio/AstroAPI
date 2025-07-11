@@ -1,5 +1,5 @@
 import pynbody
-from spectral_cube import SpectralCube
+from astropy.io import fits
 
 from src.utils import getFileType
 
@@ -16,9 +16,9 @@ def loadSimulation(path: str, family=None) -> pynbody.snapshot.SimSnap:
     return sim
 
 
-def loadObservation(path: str) -> SpectralCube:
+def loadObservation(path: str) -> fits.hdu.image.PrimaryHDU:
 
-    obs = SpectralCube.read(path)
+    obs = fits.open(path)
 
     return obs
 

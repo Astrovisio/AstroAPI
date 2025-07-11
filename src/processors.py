@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from astropy.table import Table
 
 from api.models import ConfigProcessRead
 from src.loaders import loadObservation, loadSimulation
@@ -10,39 +11,21 @@ def fits_to_dataframe(path, config: ConfigProcessRead = None):
 
     # Load the spectral cube
     cube = loadObservation(path)
+    table = Table(cube[0].data)
 
-    df_list = []
+    output = []
 
-    # Iterate over the spectral axis (velocity axis)
-    for i in range(cube.shape[0]):
-        # Slice one spectral frame at a time
-        slab = cube[i, :, :]  # shape: (y, x)
-
-        # Get world coordinates for this frame
-        world = slab.wcs.pixel_to_world_values(
-            *np.meshgrid(
-                np.arange(cube.shape[2]),  # x (RA)
-                np.arange(cube.shape[1]),  # y (Dec)
-                indexing="xy",
-            )
-        )
-
-        ra = world[0].flatten()
-        dec = world[1].flatten()
-        velo = cube.spectral_axis[i].value  # Single velocity value for this slice
-        intensity = slab.filled_data[:].value.flatten()
-
-        # Build DataFrame for this slab
-        df_slice = pd.DataFrame(
-            {"velocity": velo, "ra": ra, "dec": dec, "intensity": intensity}
-        )
-
-        df_list.append(df_slice)
-
-    # Concatenate all slices into a single DataFrame
-    df = pd.concat(df_list, ignore_index=True)
-    df.dropna(inplace=True)
-    del cube
+    for col in table.columns:
+        df = Table(table[col]).to_pandas()
+        df.columns = range(len(df.columns))
+        df_stacked = df.stack().reset_index()
+        df_stacked.columns = ['y', 'x', 'value']
+        df_stacked['z'] = int(col.split('col')[1])
+        output.append(df_stacked)
+        
+    df = pd.concat(output)[['x', 'y', 'z', 'value']].reset_index(drop=True)
+        
+    del cube, table
     if not config:
         return df
     df_sampled = df.sample(frac=config.downsampling)

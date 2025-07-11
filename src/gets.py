@@ -19,7 +19,7 @@ def getSimFamily(path: str) -> List[str]:
 def getKeys(path: str, family=None) -> list:
 
     if getFileType(path) == "fits":
-        return ["ra", "dec", "velocity", "intensity"]
+        return ["x", "y", "z", "value"]
 
     else:
         sim = loadSimulation(path, family)
@@ -36,27 +36,29 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
     if getFileType(path) == "fits":
 
         cube = fits_to_dataframe(path)
+        
+        
+        res["x"] = VariableConfig(
+            thr_min=float(cube["x"].min()),
+            thr_max=float(cube["x"].max()),
+            unit="x",
+        )
+        res["y"] = VariableConfig(
+            thr_min=float(cube["y"].min()),
+            thr_max=float(cube["y"].max()),
+            unit="y",
+        )
+        res["z"] = VariableConfig(
+            thr_min=float(cube["z"].min()),
+            thr_max=float(cube["z"].max()),
+            unit="z",
+        )
+        res["value"] = VariableConfig(
+            thr_min=float(cube["value"].min()),
+            thr_max=float(cube["value"].max()),
+            unit="value",
+        )
 
-        res["ra"] = VariableConfig(
-            thr_min=float(cube["ra"].min()),
-            thr_max=float(cube["ra"].max()),
-            unit="deg",
-        )
-        res["dec"] = VariableConfig(
-            thr_min=float(cube["dec"].min()),
-            thr_max=float(cube["dec"].max()),
-            unit="deg",
-        )
-        res["velocity"] = VariableConfig(
-            thr_min=float(cube["velocity"].min()),
-            thr_max=float(cube["velocity"].max()),
-            unit="m / s",
-        )
-        res["intensity"] = VariableConfig(
-            thr_min=float(cube["intensity"].min()),
-            thr_max=float(cube["intensity"].max()),
-            unit="K",
-        )
 
         del cube
 
