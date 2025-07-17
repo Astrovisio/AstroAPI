@@ -1,62 +1,73 @@
+import gc
+
 import numpy as np
 import polars as pl
 from astropy.table import Table
 
 from api.models import ConfigProcessRead
-from src.loaders import loadObservation, loadSimulation
+from src.loaders import load_data
 from src.utils import getFileType
 
 
 def fits_to_dataframe(path, config: ConfigProcessRead = None):
     # Load the spectral cube
-    cube = loadObservation(path)
-    table = Table(cube[0].data)
+    with load_data(path) as obs:
+        table = Table(obs[0].data)
 
-    output = []
+        def expand_table(table):
+            for col in table.columns:
+                df = pl.from_pandas(Table(table[col]).to_pandas())
+                df.columns = [str(i) for i in range(len(df.columns))]
+                df = df.with_row_index("y").with_columns(pl.col("y").cast(pl.UInt16))
+                df = df.unpivot(index="y", variable_name="x").with_columns(
+                    pl.col("x").cast(pl.UInt16)
+                )
+                df = df.with_columns(pl.lit(col.split("col")[1], pl.UInt16).alias("z"))
+                df = df.remove(pl.col("value") == 0).drop_nulls(subset=["value"])
+                df = df["x", "y", "z", "value"]
+                yield (df)
 
-    for col in table.columns:
-        df = pl.from_pandas(Table(table[col]).to_pandas())
-        df.columns = [str(i) for i in range(len(df.columns))]
-        df = df.with_row_index("y").with_columns(pl.col("y").cast(pl.UInt16))
-        df = df.unpivot(index="y", variable_name="x").with_columns(pl.col("x").cast(pl.UInt16))
-        df = df.with_columns(pl.lit(col.split("col")[1], pl.UInt16).alias("z"))
-        df = df.remove(pl.col("value") == 0).drop_nulls(subset=["value"])
-        df = df["x", "y", "z", "value"]
-        output.append(df)
+        df = pl.concat(expand_table(table))[["x", "y", "z", "value"]]
 
-    df = pl.concat(output)[["x", "y", "z", "value"]]
+        del table
 
-    del cube, table
-    if not config:
-        return df
-    df_sampled = df.sample(fraction=config.downsampling)
+    del obs
+    gc.collect()
 
-    return df_sampled
+    if config and hasattr(config, "downsampling"):
+        df = df.sample(fraction=config.downsampling)
+
+    return df
 
 
 def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
-    sim = loadSimulation(path, family)
+    with load_data(path) as sim:
 
-    sim.physical_units()
+        sim.physical_units()
 
-    data = {}
+        def variable_series(sim, config):
+            for key, value in config.variables.items():
+                if value.selected:
+                    if "-" in key:
+                        base_key, i = key.split("-")
+                        name = f"{base_key}-{i}"
+                        arr = sim[base_key][:, int(i)]
+                        dtype = pl.Float32
+                    else:
+                        name = key
+                        arr = sim[key]
+                        dtype = pl.UInt16 if key in ["x", "y", "z"] else pl.Float32
+                    yield pl.Series(name=name, values=arr, dtype=dtype)
 
-    for key, value in config.variables.items():
-        if value.selected:
-            if "-" in key:
-                key, i = key.split("-")
-                data[f"{key}-{i}"] = pl.Series(sim[key][:, int(i)], dtype=pl.Float32)
-
-            else:
-                data[key] = sim[key].astype(float)
-
-    df = pl.DataFrame(data)
-
-    df_sampled = df.sample(fraction=config.downsampling)
+        df = pl.DataFrame(variable_series(sim, config))
 
     del sim
+    gc.collect()
 
-    return df_sampled
+    if config and hasattr(config, "downsampling"):
+        df = df.sample(fraction=config.downsampling)
+
+    return df
 
 
 def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFrame:
@@ -64,14 +75,18 @@ def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFram
 
     for var_name, var_config in config.variables.items():
         if var_config.selected and var_config.thr_min_sel and var_config.thr_max_sel:
-            filtered_df = filtered_df.filter(pl.col(var_name).is_between(var_config.thr_min_sel, var_config.thr_max_sel))
+            filtered_df = filtered_df.filter(
+                pl.col(var_name).is_between(
+                    var_config.thr_min_sel, var_config.thr_max_sel
+                )
+            )
 
     return filtered_df
 
 
-def convertToDataframe(path, config: ConfigProcessRead, family=None) -> pl.DataFrame:  # Maybe needs a better name
+def convertToDataframe(path, config: ConfigProcessRead, family=None) -> pl.DataFrame:
     if getFileType(path) == "fits":
-        df = fits_to_dataframe(path, config)  # When we load an observation since the available data will always be just "x,y,z,value" it's meaningless to drop unused axes, we always need all 4
+        df = fits_to_dataframe(path, config)
 
     else:
         df = pynbody_to_dataframe(path, config, family)
