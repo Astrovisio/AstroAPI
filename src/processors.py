@@ -78,19 +78,16 @@ def pynbody_to_dataframe(
                 data[key] = sim[key].astype(float)
             var_idx += 1
             if progress_callback and n_vars > 0:
-                print(f"Processing variable {key} ({var_idx}/{n_vars})")
                 progress_callback(var_idx / n_vars * 0.4)  # up to 80% for reading
 
     df = pd.DataFrame(data)
 
     df_sampled = df.sample(frac=config.downsampling)
     if progress_callback:
-        print("Sampling DataFrame")
         progress_callback(0.45)
 
     del sim
     if progress_callback:
-        print("Sampling complete, filtering DataFrame")
         progress_callback(0.5)
 
     return df_sampled
@@ -111,9 +108,6 @@ def filter_dataframe(
                     & (filtered_df[var_name] <= var_config.thr_max_sel)
                 ]
                 if progress_callback:
-                    print(
-                        f"Filtering variable {var_name} with thresholds {var_config.thr_min_sel} and {var_config.thr_max_sel}"
-                    )
                     progress_callback(
                         0.5
                         + 0.4
@@ -127,9 +121,6 @@ def filter_dataframe(
                     var_name,
                 ] = 0
                 if progress_callback:
-                    print(
-                        f"Applying thresholds to variable {var_name}: {var_config.thr_min_sel} - {var_config.thr_max_sel}"
-                    )
                     progress_callback(
                         0.5
                         + 0.4
