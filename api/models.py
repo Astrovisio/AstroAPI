@@ -169,6 +169,21 @@ class ProjectUpdate(ProjectBase):
 # ----------------------------
 
 
+class ProcessJob(SQLModel, table=True):
+    id: int = Field(default=None, primary_key=True)
+    project_id: Optional[int] = Field(default=None, foreign_key="project.id")
+    status: str = "pending"  # "pending", "processing", "done", "error"
+    progress: float = 0.0
+    result_path: Optional[str] = Field(default=None, nullable=True)
+    error: Optional[str] = Field(default=None, nullable=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ----------------------------
+# ----------------------------
+
+
 class ConfigRenderBase(SQLModel):
     project_id: int
     var_name: str

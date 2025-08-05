@@ -66,18 +66,26 @@ class DataProcessor:
         return config_processes
 
     @staticmethod
-    def process_data(pid: int, paths: List[str], config: ConfigProcessRead) -> str:
+    def process_data(
+        pid: int, paths: List[str], config: ConfigProcessRead, progress_callback=None
+    ) -> str:
         combined_df = pl.DataFrame()
-        for path in paths:
-            df = processors.convertToDataframe(path, config)
-            logger.info(
-                f"Processing file {path} for project {pid}. Data shape: {df.shape}"
+        for i, path in enumerate(paths):
+            w = i / len(paths)
+
+            def scaled_callback(progress):
+                if progress_callback:
+                    progress_callback(progress * w * 0.8)
+
+            df = processors.convertToDataframe(
+                path, config, progress_callback=scaled_callback
             )
+            if progress_callback:
+                progress_callback(0.85 * w)
             combined_df = pl.concat([combined_df, df]).unique()
-        # new_path = f"./data/project_{pid}_processed.csv"
-        # combined_df.write_csv(new_path)
+            if progress_callback:
+                progress_callback(0.95 * w)
         return combined_df
-        # return new_path
 
 
 data_processor = DataProcessor()

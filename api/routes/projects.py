@@ -1,13 +1,19 @@
 import logging
+import os
+from threading import Thread
 from typing import List
 
 import msgpack
-import polars as pl
 from fastapi import APIRouter, Response
 
-from api.crud import crud_config_process, crud_project, update_project_config
-from api.db import SessionDep
-from api.exceptions import DataProcessingError, ProjectNotFoundError
+from api.crud import (
+    crud_config_process,
+    crud_process_job,
+    crud_project,
+    update_project_config,
+)
+from api.db import SessionDep, SessionLocal
+from api.exceptions import ProjectNotFoundError
 from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpdate
 from api.utils import data_processor
 
@@ -64,31 +70,78 @@ def remove_project(*, session: SessionDep, project_id: int):
     return {"message": "Project deleted successfully"}
 
 
-@router.post("/{project_id}/process", response_class=Response)
+@router.post("/{project_id}/process")
 def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
     project = crud_project.get_project(session, project_id)
     if not project:
         raise ProjectNotFoundError(project_id)
 
-    try:
-        paths = project.paths
-        update_project_config(session, project_id, config)
-        processed_data: pl.DataFrame = data_processor.process_data(
-            project_id, paths, config
-        )
-        logging.info(
-            f"Processed data for project {project_id} with {len(processed_data)} rows."
-        )
-        binary_data = msgpack.packb(
-            {
+    job = crud_process_job.create_process_job(session, project_id)
+
+    def run_processing(job_id, session_maker, project, config):
+        session = session_maker()
+        try:
+
+            def progress_callback(progress):
+                progress = round(progress, 2)
+                crud_process_job.update_process_job(session, job_id, progress=progress)
+
+            crud_process_job.update_process_job(
+                session, job_id, status="processing", progress=0.1
+            )
+            paths = project.paths
+            update_project_config(session, project_id, config)
+            processed_data = data_processor.process_data(
+                project_id, paths, config, progress_callback=progress_callback
+            )
+            result_path = f"./data/project_{project.id}_processed.msgpack"
+            data_dict = {
                 "columns": processed_data.columns,
-                "rows": processed_data.rows(),
-            },
-            use_bin_type=True,
+                "rows": processed_data.to_numpy().tolist(),
+            }
+            binary_data = msgpack.packb(data_dict, use_bin_type=True)
+            with open(result_path, "wb") as f:
+                f.write(binary_data)
+            crud_process_job.update_process_job(
+                session, job_id, status="done", progress=1.0, result_path=result_path
+            )
+        except Exception as e:
+            crud_process_job.update_process_job(
+                session, job_id, status="error", error=str(e), progress=1.0
+            )
+        finally:
+            session.close()
+
+    Thread(target=run_processing, args=(job.id, SessionLocal, project, config)).start()
+
+    return {"job_id": job.id}
+
+
+@router.get("/{project_id}/process/{job_id}/progress")
+def process_progress(*, session: SessionDep, project_id: int, job_id: int):
+    job = crud_process_job.get_process_job(session, job_id)
+    if not job:
+        return {"error": "Job not found"}
+    return {
+        "status": job.status,
+        "progress": job.progress,
+        "error": job.error,
+    }
+
+
+@router.get("/{project_id}/process/{job_id}/result", response_class=Response)
+def process_result(*, session: SessionDep, project_id: int, job_id: int):
+    job = crud_process_job.get_process_job(session, job_id)
+    if not job or job.status != "done" or not job.result_path:
+        return Response(
+            content="Job not found or not completed",
+            status_code=404,
+            media_type="text/plain",
         )
-        return Response(content=binary_data, media_type="application/octet-stream")
-    except Exception as e:
-        raise DataProcessingError(str(e), {"project_id": project_id})
+    with open(job.result_path, "rb") as f:
+        data = f.read()
+    os.remove(job.result_path)
+    return Response(content=data, media_type="application/octet-stream")
 
 
 # @router.post("/{project_id}/render")

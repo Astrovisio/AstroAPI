@@ -1,10 +1,14 @@
 from typing import Annotated, Generator
 
 from fastapi import Depends, HTTPException
+from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, SQLModel, create_engine
 
 DATABASE_URL = "sqlite:///./data/prod.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(
+    class_=Session, autocommit=False, autoflush=False, bind=engine
+)
 
 
 def create_db_and_tables():
