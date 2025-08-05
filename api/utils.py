@@ -1,12 +1,15 @@
+import logging
 import os
 import random
 from typing import Dict, List
 
-import pandas as pd
+import polars as pl
 from sqlmodel import SQLModel
 
 from api.models import ConfigProcessCreate, ConfigProcessRead, File
 from src import gets, processors
+
+logger = logging.getLogger(__name__)
 
 
 class FileVariable(SQLModel):

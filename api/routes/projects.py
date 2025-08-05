@@ -3,6 +3,7 @@ from threading import Thread
 from typing import List
 
 import msgpack
+import polars as pl
 from fastapi import APIRouter, Response
 
 from api.crud import (
@@ -17,6 +18,7 @@ from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpd
 from api.utils import data_processor
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=List[ProjectRead])

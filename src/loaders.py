@@ -1,32 +1,24 @@
+from contextlib import contextmanager
+
 import pynbody
-from spectral_cube import SpectralCube
+from astropy.io import fits
 
 from src.utils import getFileType
 
 
-def loadSimulation(path: str, family=None) -> pynbody.snapshot.SimSnap:
-
-    if family is None:
-        sim = pynbody.load(path)
-        sim = getattr(sim, str(sim.families()[0]))
-
+@contextmanager
+def load_data(path: str, family=None):
+    filetype = getFileType(path)
+    if filetype == "fits":
+        obs = fits.open(path)
+        try:
+            yield obs
+        finally:
+            obs.close()
     else:
-        sim = getattr(pynbody.load(path), family)
-
-    return sim
-
-
-def loadObservation(path: str) -> SpectralCube:
-
-    obs = SpectralCube.read(path)
-
-    return obs
-
-
-def load(path: str):
-
-    if getFileType(path) == "fits":
-        return loadObservation(path)
-
-    else:
-        return loadSimulation(path)
+        if family is None:
+            sim = pynbody.load(path)
+            sim = getattr(sim, str(sim.families()[0]))
+        else:
+            sim = getattr(pynbody.load(path), family)
+        yield sim
