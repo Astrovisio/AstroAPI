@@ -1,17 +1,18 @@
+import gc
 from typing import Dict, List
 
 import numpy as np
 
 from api.models import VariableConfig, VariableConfigRead
-from src.loaders import loadObservation, loadSimulation
+from src.loaders import load_data
 from src.processors import fits_to_dataframe
 from src.utils import getFileType
 
 
 def getSimFamily(path: str) -> List[str]:
 
-    sim = loadSimulation(path)
-    families = [str(el) for el in sim.families()]
+    with load_data(path) as sim:
+        families = [str(el) for el in sim.families()]
 
     return families
 
@@ -22,9 +23,11 @@ def getKeys(path: str, family=None) -> list:
         return ["x", "y", "z", "value"]
 
     else:
-        sim = loadSimulation(path, family)
-        keys = sim.loadable_keys()
+        with load_data(path) as sim:
+            keys = sim.loadable_keys()
+
         del sim
+        gc.collect()
 
         return keys
 
@@ -36,8 +39,7 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
     if getFileType(path) == "fits":
 
         cube = fits_to_dataframe(path)
-        
-        
+
         res["x"] = VariableConfig(
             thr_min=float(cube["x"].min()),
             thr_max=float(cube["x"].max()),
@@ -59,31 +61,39 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
             unit="value",
         )
 
-
         del cube
 
     else:
-        sim = loadSimulation(path, family)
-        sim.physical_units()
 
-        keys = ["x", "y", "z"] + sim.loadable_keys()
-        keys.remove("pos")
+        def compute_thresholds(sim):
 
-        for key in keys:
-            if sim[key].ndim > 1:
-                for i in range(sim[key].shape[1]):
-                    res[f"{key}-{i}"] = VariableConfigRead(
-                        thr_min=float(sim[key][:, i].min()),
-                        thr_max=float(sim[key][:, i].max()),
+            keys = ["x", "y", "z"] + sim.loadable_keys()
+            keys.remove("pos")
+
+            for key in keys:
+                if sim[key].ndim > 1:
+                    for i in range(sim[key].shape[1]):
+                        res = VariableConfigRead(
+                            thr_min=float(sim[key][:, i].min()),
+                            thr_max=float(sim[key][:, i].max()),
+                            unit=str(sim[key].units),
+                        )
+                        yield f"{key}-{i}", res
+                else:
+                    res = VariableConfigRead(
+                        thr_min=float(sim[key].min()),
+                        thr_max=float(sim[key].max()),
                         unit=str(sim[key].units),
                     )
-            else:
-                res[key] = VariableConfigRead(
-                    thr_min=float(sim[key].min()),
-                    thr_max=float(sim[key].max()),
-                    unit=str(sim[key].units),
-                )
+                    yield key, res
+
+        with load_data(path) as sim:
+            sim.physical_units()
+
+            res = dict(compute_thresholds(sim))
 
         del sim
+
+    gc.collect()
 
     return res

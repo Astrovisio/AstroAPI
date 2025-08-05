@@ -1,12 +1,15 @@
+import logging
 import os
 import random
 from typing import Dict, List
 
-import pandas as pd
+import polars as pl
 from sqlmodel import SQLModel
 
 from api.models import ConfigProcessCreate, ConfigProcessRead, File
 from src import gets, processors
+
+logger = logging.getLogger(__name__)
 
 
 class FileVariable(SQLModel):
@@ -64,14 +67,15 @@ class DataProcessor:
 
     @staticmethod
     def process_data(pid: int, paths: List[str], config: ConfigProcessRead) -> str:
-        combined_df = pd.DataFrame()
+        combined_df = pl.DataFrame()
         for path in paths:
             df = processors.convertToDataframe(path, config)
-            combined_df = pd.concat(
-                [combined_df, df], ignore_index=True
-            ).drop_duplicates()
-        new_path = f"./data/project_{pid}_processed.csv"
-        combined_df.to_csv(new_path, index=False)
+            logger.info(
+                f"Processing file {path} for project {pid}. Data shape: {df.shape}"
+            )
+            combined_df = pl.concat([combined_df, df]).unique()
+        # new_path = f"./data/project_{pid}_processed.csv"
+        # combined_df.write_csv(new_path)
         return combined_df
         # return new_path
 

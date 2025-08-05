@@ -1,6 +1,8 @@
+import logging
 from typing import List
 
 import msgpack
+import polars as pl
 from fastapi import APIRouter, Response
 
 from api.crud import crud_config_process, crud_project, update_project_config
@@ -10,6 +12,7 @@ from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpd
 from api.utils import data_processor
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=List[ProjectRead])
@@ -70,12 +73,19 @@ def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
     try:
         paths = project.paths
         update_project_config(session, project_id, config)
-        processed_data = data_processor.process_data(project_id, paths, config)
-        data_dict = {
-            "columns": processed_data.columns.tolist(),
-            "rows": processed_data.values.tolist(),
-        }
-        binary_data = msgpack.packb(data_dict, use_bin_type=True)
+        processed_data: pl.DataFrame = data_processor.process_data(
+            project_id, paths, config
+        )
+        logging.info(
+            f"Processed data for project {project_id} with {len(processed_data)} rows."
+        )
+        binary_data = msgpack.packb(
+            {
+                "columns": processed_data.columns,
+                "rows": processed_data.rows(),
+            },
+            use_bin_type=True,
+        )
         return Response(content=binary_data, media_type="application/octet-stream")
     except Exception as e:
         raise DataProcessingError(str(e), {"project_id": project_id})

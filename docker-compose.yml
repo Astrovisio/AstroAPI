@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ${VOLUME_SOURCE}/astrodata:/app/data
+      - /home/tmassagl/development/pynbody/.data:/app/data
 
 volumes:
   astrodata:
