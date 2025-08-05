@@ -69,7 +69,7 @@ class DataProcessor:
     def process_data(
         pid: int, paths: List[str], config: ConfigProcessRead, progress_callback=None
     ) -> str:
-        combined_df = pd.DataFrame()
+        combined_df = pl.DataFrame()
         for i, path in enumerate(paths):
             w = i / len(paths)
 
@@ -81,14 +81,11 @@ class DataProcessor:
                 path, config, progress_callback=scaled_callback
             )
             if progress_callback:
-                progress_callback(0.9 * w)
-            combined_df = pd.concat(
-                [combined_df, df], ignore_index=True
-            ).drop_duplicates()
+                progress_callback(0.85 * w)
+            combined_df = pl.concat([combined_df, df]).unique()
             if progress_callback:
                 progress_callback(0.95 * w)
         return combined_df
-        # return new_path
 
 
 data_processor = DataProcessor()

@@ -1,9 +1,9 @@
+import logging
 import os
 from threading import Thread
 from typing import List
 
 import msgpack
-import polars as pl
 from fastapi import APIRouter, Response
 
 from api.crud import (
@@ -13,7 +13,7 @@ from api.crud import (
     update_project_config,
 )
 from api.db import SessionDep, SessionLocal
-from api.exceptions import DataProcessingError, ProjectNotFoundError
+from api.exceptions import ProjectNotFoundError
 from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpdate
 from api.utils import data_processor
 
@@ -96,8 +96,8 @@ def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
             )
             result_path = f"./data/project_{project.id}_processed.msgpack"
             data_dict = {
-                "columns": processed_data.columns.tolist(),
-                "rows": processed_data.values.tolist(),
+                "columns": processed_data.columns,
+                "rows": processed_data.to_numpy().tolist(),
             }
             binary_data = msgpack.packb(data_dict, use_bin_type=True)
             with open(result_path, "wb") as f:

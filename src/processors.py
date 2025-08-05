@@ -1,6 +1,5 @@
 import gc
 
-import numpy as np
 import polars as pl
 from astropy.table import Table
 
@@ -41,23 +40,24 @@ def fits_to_dataframe(path, config: ConfigProcessRead = None, progress_callback=
     return df
 
 
-def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
+def pynbody_to_dataframe(
+    path, config: ConfigProcessRead, family=None, progress_callback=None
+):
     with load_data(path) as sim:
 
         sim.physical_units()
 
         def variable_series(sim, config):
+            dtype = pl.Float32
             for key, value in config.variables.items():
                 if value.selected:
                     if "-" in key:
                         base_key, i = key.split("-")
                         name = f"{base_key}-{i}"
                         arr = sim[base_key][:, int(i)]
-                        dtype = pl.Float32
                     else:
                         name = key
                         arr = sim[key]
-                        dtype = pl.UInt16 if key in ["x", "y", "z"] else pl.Float32
                     yield pl.Series(name=name, values=arr, dtype=dtype)
 
         df = pl.DataFrame(variable_series(sim, config))
@@ -71,7 +71,9 @@ def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
     return df
 
 
-def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFrame:
+def filter_dataframe(
+    df: pl.DataFrame, config: ConfigProcessRead, progress_callback=None
+) -> pl.DataFrame:
     filtered_df: pl.DataFrame = df.clone()
 
     for var_name, var_config in config.variables.items():
@@ -85,9 +87,11 @@ def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFram
     return filtered_df
 
 
-def convertToDataframe(path, config: ConfigProcessRead, family=None) -> pl.DataFrame:
+def convertToDataframe(
+    path, config: ConfigProcessRead, family=None, progress_callback=None
+) -> pl.DataFrame:
     if getFileType(path) == "fits":
-        df = fits_to_dataframe(path, config)
+        df = fits_to_dataframe(path, config, progress_callback)
 
     else:
         df = pynbody_to_dataframe(path, config, family, progress_callback)
