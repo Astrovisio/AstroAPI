@@ -75,7 +75,7 @@ class DataProcessor:
 
             def scaled_callback(progress):
                 if progress_callback:
-                    progress_callback(progress * w)
+                    progress_callback(progress * w * 0.8)
 
             df = processors.convertToDataframe(
                 path, config, progress_callback=scaled_callback

@@ -14,8 +14,9 @@ def fits_to_dataframe(path, config: ConfigProcessRead = None, progress_callback=
     with load_data(path) as obs:
         table = Table(obs[0].data)
 
-        def expand_table(table):
-            for col in table.columns:
+        def expand_table(table, progress_callback=None):
+            total = len(table.columns)
+            for idx, col in enumerate(table.columns):
                 df = pl.from_pandas(Table(table[col]).to_pandas())
                 df.columns = [str(i) for i in range(len(df.columns))]
                 df = df.with_row_index("y").with_columns(pl.col("y").cast(pl.UInt16))
@@ -25,9 +26,11 @@ def fits_to_dataframe(path, config: ConfigProcessRead = None, progress_callback=
                 df = df.with_columns(pl.lit(col.split("col")[1], pl.UInt16).alias("z"))
                 df = df.remove(pl.col("value") == 0).drop_nulls(subset=["value"])
                 df = df["x", "y", "z", "value"]
+                if progress_callback:
+                    progress_callback((idx + 1) / total)
                 yield (df)
 
-        df = pl.concat(expand_table(table))[["x", "y", "z", "value"]]
+        df = pl.concat(expand_table(table, progress_callback))[["x", "y", "z", "value"]]
 
         del table
 
@@ -47,9 +50,10 @@ def pynbody_to_dataframe(
 
         sim.physical_units()
 
-        def variable_series(sim, config):
+        def variable_series(sim, config, progress_callback=None):
             dtype = pl.Float32
-            for key, value in config.variables.items():
+            total = len(config.variables)
+            for idx, (key, value) in enumerate(config.variables.items()):
                 if value.selected:
                     if "-" in key:
                         base_key, i = key.split("-")
@@ -58,9 +62,11 @@ def pynbody_to_dataframe(
                     else:
                         name = key
                         arr = sim[key]
+                    if progress_callback:
+                        progress_callback((idx + 1) / total)
                     yield pl.Series(name=name, values=arr, dtype=dtype)
 
-        df = pl.DataFrame(variable_series(sim, config))
+        df = pl.DataFrame(variable_series(sim, config, progress_callback))
 
     del sim
     gc.collect()
@@ -71,9 +77,7 @@ def pynbody_to_dataframe(
     return df
 
 
-def filter_dataframe(
-    df: pl.DataFrame, config: ConfigProcessRead, progress_callback=None
-) -> pl.DataFrame:
+def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFrame:
     filtered_df: pl.DataFrame = df.clone()
 
     for var_name, var_config in config.variables.items():
@@ -96,4 +100,4 @@ def convertToDataframe(
     else:
         df = pynbody_to_dataframe(path, config, family, progress_callback)
 
-    return filter_dataframe(df, config, progress_callback)
+    return filter_dataframe(df, config)
