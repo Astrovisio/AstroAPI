@@ -3,7 +3,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from api.models import VariableConfig, VariableConfigRead
+from api.models import VariableBase
 from src.loaders import load_data
 from src.processors import fits_to_dataframe
 from src.utils import getFileType
@@ -32,30 +32,32 @@ def getKeys(path: str, family=None) -> list:
         return keys
 
 
-def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
+def getThresholds(path: str, family=None) -> Dict[str, VariableBase]:
 
     res = {}
+    print(f"Getting thresholds for {path}")
+    print(type(path))
 
     if getFileType(path) == "fits":
 
         cube = fits_to_dataframe(path)
 
-        res["x"] = VariableConfig(
+        res["x"] = VariableBase(
             thr_min=float(cube["x"].min()),
             thr_max=float(cube["x"].max()),
             unit="x",
         )
-        res["y"] = VariableConfig(
+        res["y"] = VariableBase(
             thr_min=float(cube["y"].min()),
             thr_max=float(cube["y"].max()),
             unit="y",
         )
-        res["z"] = VariableConfig(
+        res["z"] = VariableBase(
             thr_min=float(cube["z"].min()),
             thr_max=float(cube["z"].max()),
             unit="z",
         )
-        res["value"] = VariableConfig(
+        res["value"] = VariableBase(
             thr_min=float(cube["value"].min()),
             thr_max=float(cube["value"].max()),
             unit="value",
@@ -67,20 +69,25 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
 
         def compute_thresholds(sim):
 
+            print(f"Computing thresholds for {path}", flush=True)
             keys = ["x", "y", "z"] + sim.loadable_keys()
+            print(f"Available keys: {keys}", flush=True)
             keys.remove("pos")
 
             for key in keys:
                 if sim[key].ndim > 1:
                     for i in range(sim[key].shape[1]):
-                        res = VariableConfigRead(
+                        var_name = f"{key}-{i}"
+                        res = VariableBase(
+                            var_name=var_name,
                             thr_min=float(sim[key][:, i].min()),
                             thr_max=float(sim[key][:, i].max()),
                             unit=str(sim[key].units),
                         )
-                        yield f"{key}-{i}", res
+                        yield var_name, res
                 else:
-                    res = VariableConfigRead(
+                    res = VariableBase(
+                        var_name=key,
                         thr_min=float(sim[key].min()),
                         thr_max=float(sim[key].max()),
                         unit=str(sim[key].units),
@@ -91,6 +98,7 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableConfigRead]:
             sim.physical_units()
 
             res = dict(compute_thresholds(sim))
+            print(f"Found variables: {list(res.keys())}", flush=True)
 
         del sim
 

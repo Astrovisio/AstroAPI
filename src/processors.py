@@ -3,12 +3,12 @@ import gc
 import polars as pl
 from astropy.table import Table
 
-from api.models import ConfigProcessRead
+from api.models import FileRead
 from src.loaders import load_data
 from src.utils import getFileType
 
 
-def fits_to_dataframe(path, config: ConfigProcessRead = None, progress_callback=None):
+def fits_to_dataframe(path, file: FileRead = None, progress_callback=None):
 
     # Load the spectral cube
     with load_data(path) as obs:
@@ -37,23 +37,22 @@ def fits_to_dataframe(path, config: ConfigProcessRead = None, progress_callback=
     del obs
     gc.collect()
 
-    if config and hasattr(config, "downsampling"):
-        df = df.sample(fraction=config.downsampling)
+    if file and file.downsampling < 1.0:
+        df = df.sample(fraction=file.downsampling)
 
     return df
 
 
-def pynbody_to_dataframe(
-    path, config: ConfigProcessRead, family=None, progress_callback=None
-):
+def pynbody_to_dataframe(path, file: FileRead, family=None, progress_callback=None):
+    # TODO: conversion from old ConfigProcessRead to FileRead
     with load_data(path) as sim:
 
         sim.physical_units()
 
-        def variable_series(sim, config, progress_callback=None):
+        def variable_series(sim, file, progress_callback=None):
             dtype = pl.Float32
-            total = len(config.variables)
-            for idx, (key, value) in enumerate(config.variables.items()):
+            total = len(file.variables)
+            for idx, (key, value) in enumerate(file.variables.items()):
                 if value.selected:
                     if "-" in key:
                         base_key, i = key.split("-")
@@ -66,21 +65,22 @@ def pynbody_to_dataframe(
                         progress_callback((idx + 1) / total)
                     yield pl.Series(name=name, values=arr, dtype=dtype)
 
-        df = pl.DataFrame(variable_series(sim, config, progress_callback))
+        df = pl.DataFrame(variable_series(sim, file, progress_callback))
 
     del sim
     gc.collect()
 
-    if config and hasattr(config, "downsampling"):
-        df = df.sample(fraction=config.downsampling)
+    if file and file.downsampling < 1.0:
+        df = df.sample(fraction=file.downsampling)
 
     return df
 
 
-def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFrame:
+def filter_dataframe(df: pl.DataFrame, file: FileRead) -> pl.DataFrame:
+    # TODO: conversion from old ConfigProcessRead to FileRead
     filtered_df: pl.DataFrame = df.clone()
 
-    for var_name, var_config in config.variables.items():
+    for var_name, var_config in file.variables.items():
         if var_config.selected and var_config.thr_min_sel and var_config.thr_max_sel:
             filtered_df = filtered_df.filter(
                 pl.col(var_name).is_between(
@@ -92,12 +92,13 @@ def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFram
 
 
 def convertToDataframe(
-    path, config: ConfigProcessRead, family=None, progress_callback=None
+    path, file: FileRead, family=None, progress_callback=None
 ) -> pl.DataFrame:
+    # TODO: conversion from old ConfigProcessRead to FileRead
     if getFileType(path) == "fits":
-        df = fits_to_dataframe(path, config, progress_callback)
+        df = fits_to_dataframe(path, file, progress_callback)
 
     else:
-        df = pynbody_to_dataframe(path, config, family, progress_callback)
+        df = pynbody_to_dataframe(path, file, family, progress_callback)
 
-    return filter_dataframe(df, config)
+    return filter_dataframe(df, file)
