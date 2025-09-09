@@ -34,8 +34,13 @@ class TestVariable(SQLModel):
 
 
 class DataProcessor:
+
     @staticmethod
     def read_data(file_paths: List[str]) -> Dict[str, FileCreate]:
+        """
+        Reads data from given file paths and extracts variables with their thresholds.
+        Returns a mapping of file paths to FileCreate objects containing variable info.
+        """
         if os.getenv("API_TEST"):
             return DataProcessor.read_data_test(file_paths)
 
@@ -44,7 +49,6 @@ class DataProcessor:
             file_type = "hdf5" if file_path.endswith(".hdf5") else "fits"
             file = FileCreate(file_type=file_type, file_path=file_path)
             variables = gets.getThresholds(file_path)
-            print(f"Extracted variables: {variables}", flush=True)
             for key, value in variables.items():
                 value.thr_min_sel = value.thr_min
                 value.thr_max_sel = value.thr_max

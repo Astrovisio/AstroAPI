@@ -6,10 +6,15 @@ from typing import List
 import msgpack
 from fastapi import APIRouter, HTTPException, Response
 
-from api.db import SessionDep, SessionLocal
+from api.db import ProjectServiceDep, SessionLocal
 from api.exceptions import ProjectNotFoundError
-from api.models import FileUpdate, ProjectCreate, ProjectRead, ProjectUpdate
-from api.services import ProjectService
+from api.models import (
+    FileUpdate,
+    ProjectCreate,
+    ProjectFilesUpdate,
+    ProjectRead,
+    ProjectUpdate,
+)
 from api.utils import data_processor
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -17,41 +22,40 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=List[ProjectRead])
-def read_projects(*, session: SessionDep):
+def read_projects(*, service: ProjectServiceDep):
     """Get all projects"""
-
-    service = ProjectService(session)
     return service.get_projects()
 
 
 @router.post("/", response_model=ProjectRead)
-def create_project(project_data: ProjectCreate, session: SessionDep):
+def create_project(*, project_data: ProjectCreate, service: ProjectServiceDep):
     """Create a new project with files and variables."""
-    service = ProjectService(session)
 
-    files = data_processor.read_data(project_data.file_paths)  # Your existing function
-
-    try:
-        return service.create_project(project_data, files)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.create_project(project_data=project_data)
 
 
-# def create_new_project(*, session: SessionDep, project: ProjectCreate):
-#     """Create a new project with files"""
-#     return crud_project.create_project(session, project)
-#
-#
-# @router.get("/{project_id}", response_model=ProjectRead)
-# def read_project(*, session: SessionDep, project_id: int):
-#     """Get a single project"""
-#     return crud_project.get_project(session, project_id)
-#
-#
-# @router.put("/{project_id}", response_model=ProjectRead)
-# def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
-#     """Update project and optionally its files"""
-#     return crud_project.update_project(session, project_id, project)
+@router.get("/{project_id}", response_model=ProjectRead)
+def read_project(*, project_id: int, service: ProjectServiceDep):
+    """Get a single project"""
+    return service.get_project(project_id=project_id)
+
+
+@router.put("/{project_id}", response_model=ProjectRead)
+def update_project(
+    *, project_id: int, project: ProjectUpdate, service: ProjectServiceDep
+):
+    """Update project and optionally its files"""
+    return service.update_project(project_id=project_id, project_update=project)
+
+
+@router.put("/{project_id}/files", response_model=ProjectRead)
+def replace_project_files(
+    *, project_id: int, files_update: ProjectFilesUpdate, service: ProjectServiceDep
+):
+    """Replace all files in a project"""
+    return service.replace_project_files(project_id, files_update.file_paths)
+
+
 #
 #
 # @router.delete("/{project_id}")

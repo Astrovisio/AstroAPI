@@ -23,13 +23,14 @@ class FileBase(SQLModel):
     file_path: str
     processed: bool = False
     downsampling: float = 1.0
+    processed_path: Optional[str] = None
 
 
 class VariableBase(SQLModel):
     var_name: str
     thr_min: float = -float("inf")
-    thr_min_sel: Optional[float] = None
     thr_max: float = float("inf")
+    thr_min_sel: Optional[float] = None
     thr_max_sel: Optional[float] = None
     selected: bool = False
     unit: str
@@ -110,8 +111,15 @@ class FileUpdate(FileBase):
 
 
 class ProjectUpdate(ProjectBase):
-    file_paths: Optional[List[str]] = None
+    """Update project metadata and variable configurations only"""
+
     files: List[FileUpdate] = []
+
+
+class ProjectFilesUpdate(SQLModel):
+    """Replace all files in a project"""
+
+    file_paths: List[str]
 
     @field_validator("file_paths")
     @classmethod
@@ -139,11 +147,6 @@ class ProjectUpdate(ProjectBase):
         return v
 
 
-# ----------------------------
-# Many-to-Many Link Models
-# ----------------------------
-
-
 class FileProjectLink(SQLModel, table=True):
     project_id: Optional[int] = Field(
         default=None, foreign_key="project.id", primary_key=True
@@ -158,22 +161,39 @@ class FileProjectLink(SQLModel, table=True):
 # ----------------------------
 
 
-class Variable(VariableBase, table=True):
+class Variable(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     file_id: int = Field(foreign_key="file.id")
+    var_name: str
+    unit: str
+    thr_min: float = -float("inf")
+    thr_max: float = float("inf")
 
     # Relationship
     file: "File" = Relationship(back_populates="variables")
 
 
+class ProjectVariableConfig(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id")
+    variable_id: int = Field(foreign_key="variable.id")
+    thr_min_sel: Optional[float] = None
+    thr_max_sel: Optional[float] = None
+    selected: bool = False
+    x_axis: bool = False
+    y_axis: bool = False
+    z_axis: bool = False
+
+
 class File(FileBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    file_path: str = Field(index=True, unique=True)
 
     # Relationships
     projects: List["Project"] = Relationship(
         back_populates="files", link_model=FileProjectLink
     )
-    variables: List[Variable] = Relationship(back_populates="file")
+    variables: List[Variable] = Relationship(back_populates="file", cascade_delete=True)
 
 
 class Project(ProjectBase, table=True):

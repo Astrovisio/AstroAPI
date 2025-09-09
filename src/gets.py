@@ -35,29 +35,31 @@ def getKeys(path: str, family=None) -> list:
 def getThresholds(path: str, family=None) -> Dict[str, VariableBase]:
 
     res = {}
-    print(f"Getting thresholds for {path}")
-    print(type(path))
 
     if getFileType(path) == "fits":
 
         cube = fits_to_dataframe(path)
 
         res["x"] = VariableBase(
+            var_name="x",
             thr_min=float(cube["x"].min()),
             thr_max=float(cube["x"].max()),
             unit="x",
         )
         res["y"] = VariableBase(
+            var_name="y",
             thr_min=float(cube["y"].min()),
             thr_max=float(cube["y"].max()),
             unit="y",
         )
         res["z"] = VariableBase(
+            var_name="z",
             thr_min=float(cube["z"].min()),
             thr_max=float(cube["z"].max()),
             unit="z",
         )
         res["value"] = VariableBase(
+            var_name="value",
             thr_min=float(cube["value"].min()),
             thr_max=float(cube["value"].max()),
             unit="value",
@@ -69,9 +71,7 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableBase]:
 
         def compute_thresholds(sim):
 
-            print(f"Computing thresholds for {path}", flush=True)
             keys = ["x", "y", "z"] + sim.loadable_keys()
-            print(f"Available keys: {keys}", flush=True)
             keys.remove("pos")
 
             for key in keys:
@@ -98,7 +98,6 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableBase]:
             sim.physical_units()
 
             res = dict(compute_thresholds(sim))
-            print(f"Found variables: {list(res.keys())}", flush=True)
 
         del sim
 
