@@ -1,70 +1,63 @@
 import logging
 
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
-from pydantic import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
+from fastapi import status
 
 from api.exceptions import APIException
 
 logger = logging.getLogger(__name__)
 
 
-async def api_exception_handler(request: Request, exc: APIException) -> JSONResponse:
-    """Handle custom API exceptions"""
-    logger.error(f"API Exception: {exc.detail}", extra={"context": exc.context})
-
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": {
-                "code": exc.error_code,
-                "message": exc.detail,
-                "context": exc.context,
-            }
-        },
-    )
+class ProjectNotFoundError(APIException):
+    def __init__(self, project_id: int):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            error_code="PROJECT_NOT_FOUND",
+            detail=f"Project with id {project_id} not found",
+            context={"project_id": project_id},
+        )
 
 
-async def sqlalchemy_exception_handler(
-    request: Request, exc: SQLAlchemyError
-) -> JSONResponse:
-    """Handle database errors"""
-    logger.error(f"Database error: {str(exc)}")
+class FileNotFoundError(APIException):
+    def __init__(self, file_id: int = None, file_path: str = None):
+        if file_id:
+            detail = f"File with id {file_id} not found"
+            context = {"file_id": file_id}
+        else:
+            detail = f"File with path '{file_path}' not found"
+            context = {"file_path": file_path}
 
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": {
-                "code": "DATABASE_ERROR",
-                "message": "An internal database error occurred",
-                "context": {},
-            }
-        },
-    )
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            error_code="FILE_NOT_FOUND",
+            detail=detail,
+            context=context,
+        )
 
 
-async def pydantic_validation_exception_handler(
-    request: Request, exc: ValidationError
-) -> JSONResponse:
-    """Handle Pydantic validation errors (including custom validators)"""
-    # Check if it's one of our custom validation errors
-    for error in exc.errors():
-        if error.get("type") == "value_error" and hasattr(
-            error.get("ctx", {}), "error_code"
-        ):
-            # This is one of our custom APIExceptions wrapped in ValidationError
-            custom_exc = error["ctx"]
-            return await api_exception_handler(request, custom_exc)
+class VariableNotFoundError(APIException):
+    def __init__(
+        self, variable_id: int = None, var_name: str = None, file_id: int = None
+    ):
+        if variable_id:
+            detail = f"Variable with id {variable_id} not found"
+            context = {"variable_id": variable_id}
+        else:
+            detail = f"Variable '{var_name}' not found in file {file_id}"
+            context = {"var_name": var_name, "file_id": file_id}
 
-    # Default Pydantic validation error handling
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "error": {
-                "code": "VALIDATION_ERROR",
-                "message": "Request validation failed",
-                "context": {"details": exc.errors()},
-            }
-        },
-    )
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            error_code="VARIABLE_NOT_FOUND",
+            detail=detail,
+            context=context,
+        )
+
+
+class FileProcessingError(APIException):
+    def __init__(self, file_paths: list, error_details: str):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            error_code="FILE_PROCESSING_ERROR",
+            detail=f"Failed to process files: {error_details}",
+            context={"file_paths": file_paths, "error_details": error_details},
+        )

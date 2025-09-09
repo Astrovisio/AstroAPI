@@ -4,6 +4,12 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
+from api.error_handlers import (
+    FileNotFoundError,
+    FileProcessingError,
+    ProjectNotFoundError,
+    VariableNotFoundError,
+)
 from api.models import (
     File,
     FileCreate,
@@ -58,6 +64,8 @@ class ProjectService:
             .where(Project.id == project_id)
         )
         project = self.session.exec(statement).first()
+        if not project:
+            raise ProjectNotFoundError(project_id)
         project.last_opened = datetime.utcnow()
         self.session.add(project)
         self.session.commit()
@@ -79,7 +87,7 @@ class ProjectService:
 
         db_project = self.session.get(Project, project_id)
         if not db_project:
-            return None
+            raise ProjectNotFoundError(project_id)
 
         current_file_paths = {f.file_path for f in db_project.files}
         new_file_paths_set = set(new_file_paths)
@@ -110,7 +118,7 @@ class ProjectService:
 
         db_project = self.session.get(Project, project_id)
         if not db_project:
-            return None
+            raise ProjectNotFoundError(project_id)
 
         db_project.last_opened = datetime.utcnow()
 
@@ -131,6 +139,8 @@ class ProjectService:
         """Delete project and handle cascading deletes."""
         db_project = self.session.get(Project, project_id)
         if not db_project:
+            raise ProjectNotFoundError(project_id)
+        if not db_project:
             return False
 
         self.session.delete(db_project)
@@ -148,7 +158,7 @@ class FileService:
         """Update file processing status and cache path."""
         db_file = self.session.get(File, file_id)
         if not db_file:
-            return None
+            raise FileNotFoundError(file_id=file_id)
 
         db_file.processed = processed
         if processed_file_path:
@@ -250,7 +260,7 @@ class VariableService:
         """Update variable selection and other properties."""
         db_variable = self.session.get(Variable, variable_id)
         if not db_variable:
-            return None
+            raise VariableNotFoundError(variable_id=variable_id)
 
         db_variable.selected = selected
         for key, value in kwargs.items():
@@ -273,6 +283,8 @@ class VariableService:
                     if hasattr(db_variable, key):
                         setattr(db_variable, key, value)
                 updated_vars.append(db_variable)
+            if not db_variable:
+                raise VariableNotFoundError(variable_id=var_id)
 
         self.session.commit()
         return [VariableRead.model_validate(var) for var in updated_vars]
