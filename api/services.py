@@ -16,6 +16,7 @@ from api.models import (
     FileProjectLink,
     FileRead,
     FileUpdate,
+    ProcessJob,
     Project,
     ProjectCreate,
     ProjectRead,
@@ -145,7 +146,6 @@ class ProjectService:
 
         self.session.delete(db_project)
         self.session.commit()
-        return True
 
 
 class FileService:
@@ -338,3 +338,31 @@ class VariableService:
                         z_axis=var_data.z_axis,
                     )
                     self.session.add(new_config)
+
+
+class ProcessJobService:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def get_job(self, job_id: int) -> Optional[ProcessJob]:
+        """Get a process job by ID"""
+        return self.session.get(ProcessJob, job_id)
+
+    def get_job_progress(self, job_id: int) -> Dict:
+        """Get job progress information"""
+        job = self.get_job(job_id)
+        if not job:
+            return {"error": "Job not found"}
+
+        return {
+            "status": job.status,
+            "progress": job.progress,
+            "error": job.error,
+        }
+
+    def get_job_result_path(self, job_id: int) -> Optional[str]:
+        """Get job result path if completed"""
+        job = self.get_job(job_id)
+        if job and job.status == "done" and job.result_path:
+            return job.result_path
+        return None

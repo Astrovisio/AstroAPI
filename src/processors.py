@@ -92,7 +92,7 @@ def filter_dataframe(df: pl.DataFrame, file: FileRead) -> pl.DataFrame:
 
 
 def convertToDataframe(
-    path, file: FileRead, family=None, progress_callback=None
+    path: str, file: FileRead, family=None, progress_callback=None
 ) -> pl.DataFrame:
     # TODO: conversion from old ConfigProcessRead to FileRead
     if getFileType(path) == "fits":

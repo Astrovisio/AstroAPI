@@ -6,7 +6,7 @@ from typing import Dict, List
 import polars as pl
 from sqlmodel import SQLModel
 
-from api.models import FileCreate, VariableBase
+from api.models import FileCreate, FileRead, VariableBase
 from src import gets, processors
 
 logger = logging.getLogger(__name__)
@@ -69,27 +69,27 @@ class DataProcessor:
             mapping_files[file.file_path] = file
         return mapping_files
 
-    # @staticmethod
-    # def process_data(
-    #     pid: int, paths: List[str], config: ConfigProcessRead, progress_callback=None
-    # ) -> str:
-    #     combined_df = pl.DataFrame()
-    #     for i, path in enumerate(paths):
-    #         w = i / len(paths)
-    #
-    #         def scaled_callback(progress):
-    #             if progress_callback:
-    #                 progress_callback(progress * w * 0.8)
-    #
-    #         df = processors.convertToDataframe(
-    #             path, config, progress_callback=scaled_callback
-    #         )
-    #         if progress_callback:
-    #             progress_callback(0.85 * w)
-    #         combined_df = pl.concat([combined_df, df]).unique()
-    #         if progress_callback:
-    #             progress_callback(0.95 * w)
-    #     return combined_df
+    @staticmethod
+    def process_data(
+        pid: int, paths: List[str], file_config: FileRead, progress_callback=None
+    ) -> str:
+        combined_df = pl.DataFrame()
+        for i, path in enumerate(paths):
+            w = i / len(paths)
+
+            def scaled_callback(progress):
+                if progress_callback:
+                    progress_callback(progress * w * 0.8)
+
+            df = processors.convertToDataframe(
+                path=path, file=file_config, progress_callback=scaled_callback
+            )
+            if progress_callback:
+                progress_callback(0.85 * w)
+            combined_df = pl.concat([combined_df, df]).unique()
+            if progress_callback:
+                progress_callback(0.95 * w)
+        return combined_df
 
 
 data_processor = DataProcessor()

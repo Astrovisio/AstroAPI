@@ -87,6 +87,7 @@ class VariableRead(VariableBase):
 
 
 class FileRead(FileBase):
+    id: int
     variables: List[VariableRead] = []
 
 
