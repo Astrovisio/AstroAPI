@@ -73,6 +73,7 @@ class DataProcessor:
     def process_data(
         pid: int, paths: List[str], file_config: FileRead, progress_callback=None
     ) -> str:
+        # FIX: this
         combined_df = pl.DataFrame()
         for i, path in enumerate(paths):
             w = i / len(paths)

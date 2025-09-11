@@ -28,9 +28,10 @@ class Variable(SQLModel, table=True):
     file: "File" = Relationship(back_populates="variables")
 
 
-class ProjectVariableConfig(SQLModel, table=True):
+class ProjectFileVariableConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="project.id")
+    file_id: int = Field(foreign_key="file.id")
     variable_id: int = Field(foreign_key="variable.id")
     thr_min_sel: Optional[float] = None
     thr_max_sel: Optional[float] = None
@@ -65,6 +66,7 @@ class Project(ProjectBase, table=True):
 class ProcessJob(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: Optional[int] = Field(default=None, foreign_key="project.id")
+    file_id: Optional[int] = Field(default=None, foreign_key="file.id")
     status: str = "pending"  # "pending", "processing", "done", "error"
     progress: float = 0.0
     result_path: Optional[str] = Field(default=None, nullable=True)

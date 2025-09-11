@@ -3,7 +3,7 @@ from .db import (
     FileProjectLink,
     ProcessJob,
     Project,
-    ProjectVariableConfig,
+    ProjectFileVariableConfig,
     Variable,
 )
 from .file import FileCreate, FileRead, FileUpdate

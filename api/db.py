@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, SQLModel, create_engine
 
-from api.services import ProjectService
+from api.services import FileService, ProcessJobService, ProjectService
 
 # Ensure data directory exists
 os.makedirs("./data/astrovisio_files", exist_ok=True)
@@ -38,3 +38,17 @@ def project_service_dep(session: SessionDep) -> ProjectService:
 
 
 ProjectServiceDep = Annotated[ProjectService, Depends(project_service_dep)]
+
+
+def file_service_dep(session: SessionDep) -> FileService:
+    return FileService(session)
+
+
+FileServiceDep = Annotated[FileService, Depends(file_service_dep)]
+
+
+def processjob_service_dep(session: SessionDep):
+    return ProcessJobService(session)
+
+
+ProcessJobServiceDep = Annotated[ProcessJobService, Depends(processjob_service_dep)]

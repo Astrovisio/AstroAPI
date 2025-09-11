@@ -53,9 +53,7 @@ class ProjectRead(ProjectBase):
 
 
 class ProjectUpdate(ProjectBase):
-    """Update project metadata and variable configurations only"""
-
-    files: List[FileUpdate] = []
+    pass
 
 
 class ProjectFilesUpdate(SQLModel):

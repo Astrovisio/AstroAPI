@@ -19,9 +19,9 @@ from api.models import (
     ProcessJob,
     Project,
     ProjectCreate,
+    ProjectFileVariableConfig,
     ProjectRead,
     ProjectUpdate,
-    ProjectVariableConfig,
     Variable,
     VariableRead,
 )
@@ -68,9 +68,28 @@ class ProjectService:
         if not project:
             raise ProjectNotFoundError(project_id)
         project.last_opened = datetime.utcnow()
-        self.session.add(project)
-        self.session.commit()
-        return ProjectRead.model_validate(project) if project else None
+        temp_project_read = ProjectRead.model_validate(project)
+
+        variable_service = VariableService(self.session)
+        for file in project.files:
+            variable_service.get_file_variable_configs(project.id, file.id)
+            for var in file.variables:
+                cfg = self.session.exec(
+                    select(ProjectFileVariableConfig).where(
+                        ProjectFileVariableConfig.project_id == project.id,
+                        ProjectFileVariableConfig.file_id == file.id,
+                        ProjectFileVariableConfig.variable_id == var.id,
+                    )
+                ).first()
+                for i, f in enumerate(temp_project_read.files):
+                    if f.id == file.id:
+                        for j, v in enumerate(f.variables):
+                            if v.var_name == var.var_name:
+                                temp_project_read.files[i].variables[j] = (
+                                    variable_service.build_variable_read(var, cfg)
+                                )
+
+        return temp_project_read
 
     def get_projects(self) -> List[ProjectRead]:
         """Get all projects with files and variables loaded."""
@@ -127,11 +146,11 @@ class ProjectService:
             if field != "files":
                 setattr(db_project, field, value)
 
-        if project_update.files:
-            variable_service = VariableService(self.session)
-            variable_service.update_project_variable_configs(
-                project_id, project_update.files
-            )
+        # if project_update.files:
+        #     variable_service = VariableService(self.session)
+        #     variable_service.update_project_variable_configs(
+        #         project_id, project_update.files
+        #     )
 
         self.session.commit()
         return self.get_project(project_id)
@@ -151,6 +170,82 @@ class ProjectService:
 class FileService:
     def __init__(self, session: Session):
         self.session = session
+
+    def get_file(self, project_id: int, file_id: int) -> FileRead:
+        """Get a single file in a project with its variable configurations."""
+        db_file = self.session.exec(
+            select(File)
+            .options(selectinload(File.variables))
+            .join(FileProjectLink)
+            .where(
+                File.id == file_id,
+                FileProjectLink.project_id == project_id,
+            )
+        ).first()
+
+        if not db_file:
+            raise FileNotFoundError(file_id=file_id)
+
+        file_read = FileRead.model_validate(db_file)
+
+        variable_service = VariableService(self.session)
+        for var in db_file.variables:
+            cfg = self.session.exec(
+                select(ProjectFileVariableConfig).where(
+                    ProjectFileVariableConfig.project_id == project_id,
+                    ProjectFileVariableConfig.file_id == file_id,
+                    ProjectFileVariableConfig.variable_id == var.id,
+                )
+            ).first()
+            for i, v in enumerate(file_read.variables):
+                if v.var_name == var.var_name:
+                    file_read.variables[i] = variable_service.build_variable_read(
+                        var, cfg
+                    )
+
+        return file_read
+
+    def update_file(
+        self, project_id: int, file_id: int, file_update: FileUpdate
+    ) -> FileRead:
+        """Update file and its variable configurations for a specific project."""
+
+        db_file = self.session.get(File, file_id)
+        if not db_file:
+            raise FileNotFoundError(file_id=file_id)
+
+        if "downsampling" in file_update.model_dump(exclude_unset=True):
+            if file_update.downsampling <= 0 or file_update.downsampling > 1:
+                raise ValueError("Downsampling must be between 0 (exclusive) and 1.")
+
+            db_file.downsampling = file_update.downsampling
+
+        if file_update.variables:
+            variable_service = VariableService(self.session)
+            variable_service.update_file_variable_configs(
+                project_id, file_id, file_update
+            )
+
+        self.session.commit()
+        self.session.refresh(db_file)
+        file_read = FileRead.model_validate(db_file)
+
+        variable_service = VariableService(self.session)
+        for var in db_file.variables:
+            cfg = self.session.exec(
+                select(ProjectFileVariableConfig).where(
+                    ProjectFileVariableConfig.project_id == project_id,
+                    ProjectFileVariableConfig.file_id == file_id,
+                    ProjectFileVariableConfig.variable_id == var.id,
+                )
+            ).first()
+            for i, v in enumerate(file_read.variables):
+                if v.var_name == var.var_name:
+                    file_read.variables[i] = variable_service.build_variable_read(
+                        var, cfg
+                    )
+
+        return file_read
 
     def update_file_processing_status(
         self, file_id: int, processed: bool, processed_file_path: Optional[str] = None
@@ -289,55 +384,85 @@ class VariableService:
         self.session.commit()
         return [VariableRead.model_validate(var) for var in updated_vars]
 
-    def update_project_variable_configs(
-        self, project_id: int, files_data: List[FileUpdate]
+    def update_file_variable_configs(
+        self, project_id: int, file_id: int, file_data: FileUpdate
     ) -> None:
-        """Update ProjectVariableConfig entries for all variables in the payload."""
-        for file_data in files_data:
-            db_file = self.session.exec(
-                select(File).where(File.file_path == file_data.file_path)
+        """Update ProjectFileVariableConfig entries for all variables in the payload."""
+        db_file = self.session.exec(select(File).where(File.id == file_id)).first()
+
+        if not db_file:
+            raise FileNotFoundError(file_id=file_id)
+
+        for var_data in file_data.variables:
+            db_var = self.session.exec(
+                select(Variable).where(
+                    Variable.file_id == db_file.id,
+                    Variable.var_name == var_data.var_name,
+                )
             ).first()
 
-            if not db_file:
+            if not db_var:
                 continue
 
-            for var_data in file_data.variables:
-                db_var = self.session.exec(
-                    select(Variable).where(
-                        Variable.file_id == db_file.id,
-                        Variable.var_name == var_data.var_name,
-                    )
-                ).first()
+            existing_config = self.session.exec(
+                select(ProjectFileVariableConfig).where(
+                    ProjectFileVariableConfig.project_id == project_id,
+                    ProjectFileVariableConfig.file_id == file_id,
+                    ProjectFileVariableConfig.variable_id == db_var.id,
+                )
+            ).first()
 
-                if not db_var:
-                    continue
+            if existing_config:
+                existing_config.thr_min_sel = var_data.thr_min_sel
+                existing_config.thr_max_sel = var_data.thr_max_sel
+                existing_config.selected = var_data.selected
+                existing_config.x_axis = var_data.x_axis
+                existing_config.y_axis = var_data.y_axis
+                existing_config.z_axis = var_data.z_axis
+                self.session.add(existing_config)
+            else:
+                new_config = ProjectFileVariableConfig(
+                    project_id=project_id,
+                    file_id=file_id,
+                    variable_id=db_var.id,
+                    thr_min_sel=var_data.thr_min_sel,
+                    thr_max_sel=var_data.thr_max_sel,
+                    selected=var_data.selected,
+                    x_axis=var_data.x_axis,
+                    y_axis=var_data.y_axis,
+                    z_axis=var_data.z_axis,
+                )
+                self.session.add(new_config)
+            self.session.commit()
 
-                existing_config = self.session.exec(
-                    select(ProjectVariableConfig).where(
-                        ProjectVariableConfig.project_id == project_id,
-                        ProjectVariableConfig.variable_id == db_var.id,
-                    )
-                ).first()
+    def get_file_variable_configs(
+        self, project_id: int, file_id: int
+    ) -> List[ProjectFileVariableConfig]:
+        """Get ProjectVariableConfig entries for a specific file in a project."""
+        configs = self.session.exec(
+            select(ProjectFileVariableConfig).where(
+                ProjectFileVariableConfig.project_id == project_id,
+                ProjectFileVariableConfig.file_id == file_id,
+            )
+        ).all()
+        return list(configs)
 
-                if existing_config:
-                    existing_config.thr_min_sel = var_data.thr_min_sel
-                    existing_config.thr_max_sel = var_data.thr_max_sel
-                    existing_config.selected = var_data.selected
-                    existing_config.x_axis = var_data.x_axis
-                    existing_config.y_axis = var_data.y_axis
-                    existing_config.z_axis = var_data.z_axis
-                else:
-                    new_config = ProjectVariableConfig(
-                        project_id=project_id,
-                        variable_id=db_var.id,
-                        thr_min_sel=var_data.thr_min_sel,
-                        thr_max_sel=var_data.thr_max_sel,
-                        selected=var_data.selected,
-                        x_axis=var_data.x_axis,
-                        y_axis=var_data.y_axis,
-                        z_axis=var_data.z_axis,
-                    )
-                    self.session.add(new_config)
+    def build_variable_read(
+        self, var: Variable, cfg: ProjectFileVariableConfig
+    ) -> VariableRead:
+        """Helper to build VariableRead from Variable and its config."""
+        return VariableRead(
+            var_name=var.var_name,
+            unit=var.unit,
+            thr_min=var.thr_min,
+            thr_max=var.thr_max,
+            thr_min_sel=cfg.thr_min_sel if cfg else None,
+            thr_max_sel=cfg.thr_max_sel if cfg else None,
+            selected=cfg.selected if cfg else False,
+            x_axis=cfg.x_axis if cfg else False,
+            y_axis=cfg.y_axis if cfg else False,
+            z_axis=cfg.z_axis if cfg else False,
+        )
 
 
 class ProcessJobService:
