@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from api.db import create_db_and_tables
 from api.exceptions import APIException
+from api.routes.jobs import router as jobs_router
 from api.routes.projects import router as projects_router
 
 
@@ -15,7 +16,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, debug=True)
 
 
 @app.exception_handler(APIException)
@@ -36,6 +37,7 @@ def health():
 
 
 app.include_router(projects_router, prefix="/api")
+app.include_router(jobs_router, prefix="/api")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="debug")

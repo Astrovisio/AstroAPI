@@ -1,10 +1,8 @@
-import logging
 from typing import List
 
 from fastapi import APIRouter
 
-from api.background_tasks import BackgroundTaskService
-from api.db import FileServiceDep, ProcessJobServiceDep, ProjectServiceDep
+from api.deps import FileServiceDep, ProcessJobServiceDep, ProjectServiceDep
 from api.models import (
     FileRead,
     FileUpdate,
@@ -15,7 +13,6 @@ from api.models import (
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=List[ProjectRead])
@@ -81,40 +78,8 @@ def update_file(
 # Processing operations
 @router.post("/{project_id}/file/{file_id}/process")
 def process_project(*, project_id: int, file_id: int, service: ProcessJobServiceDep):
-    # FIX: this
     """Start processing a project"""
 
-    job_id = service.start_project_processing(project_id=project_id, file_id=file_id)
+    job_id = service.start_file_processing(project_id=project_id, file_id=file_id)
 
     return {"job_id": job_id}
-
-
-#
-#
-# @router.get("/{project_id}/process/{job_id}/progress")
-# def process_progress(*, session: SessionDep, project_id: int, job_id: int):
-#     """Get processing progress"""
-#     job = crud_process_job.get_process_job(session, job_id)
-#     if not job:
-#         return {"error": "Job not found"}
-#     return {
-#         "status": job.status,
-#         "progress": job.progress,
-#         "error": job.error,
-#     }
-#
-#
-# @router.get("/{project_id}/process/{job_id}/result", response_class=Response)
-# def process_result(*, session: SessionDep, project_id: int, job_id: int):
-#     """Get processing result"""
-#     job = crud_process_job.get_process_job(session, job_id)
-#     if not job or job.status != "done" or not job.result_path:
-#         return Response(
-#             content="Job not found or not completed",
-#             status_code=404,
-#             media_type="text/plain",
-#         )
-#     with open(job.result_path, "rb") as f:
-#         data = f.read()
-#     os.remove(job.result_path)
-#     return Response(content=data, media_type="application/octet-stream")

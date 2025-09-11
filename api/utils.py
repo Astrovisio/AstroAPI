@@ -70,26 +70,21 @@ class DataProcessor:
         return mapping_files
 
     @staticmethod
-    def process_data(
-        pid: int, paths: List[str], file_config: FileRead, progress_callback=None
-    ) -> str:
-        # FIX: this
+    def process_data(file_config: FileRead, progress_callback=None) -> str:
         combined_df = pl.DataFrame()
-        for i, path in enumerate(paths):
-            w = i / len(paths)
 
-            def scaled_callback(progress):
-                if progress_callback:
-                    progress_callback(progress * w * 0.8)
+        def scaled_callback(progress):
+            if progress_callback:
+                progress_callback(progress * 0.8)
 
-            df = processors.convertToDataframe(
-                path=path, file=file_config, progress_callback=scaled_callback
-            )
-            if progress_callback:
-                progress_callback(0.85 * w)
-            combined_df = pl.concat([combined_df, df]).unique()
-            if progress_callback:
-                progress_callback(0.95 * w)
+        df = processors.convertToDataframe(
+            file=file_config, progress_callback=scaled_callback
+        )
+        if progress_callback:
+            progress_callback(0.85)
+        combined_df = pl.concat([combined_df, df]).unique()
+        if progress_callback:
+            progress_callback(0.95)
         return combined_df
 
 

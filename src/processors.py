@@ -8,10 +8,10 @@ from src.loaders import load_data
 from src.utils import getFileType
 
 
-def fits_to_dataframe(path, file: FileRead = None, progress_callback=None):
+def fits_to_dataframe(file: FileRead = None, progress_callback=None):
 
     # Load the spectral cube
-    with load_data(path) as obs:
+    with load_data(file.file_path) as obs:
         table = Table(obs[0].data)
 
         def expand_table(table, progress_callback=None):
@@ -43,24 +43,24 @@ def fits_to_dataframe(path, file: FileRead = None, progress_callback=None):
     return df
 
 
-def pynbody_to_dataframe(path, file: FileRead, family=None, progress_callback=None):
-    # TODO: conversion from old ConfigProcessRead to FileRead
-    with load_data(path) as sim:
+def pynbody_to_dataframe(file: FileRead, family=None, progress_callback=None):
+    with load_data(file.file_path) as sim:
 
         sim.physical_units()
 
         def variable_series(sim, file, progress_callback=None):
             dtype = pl.Float32
             total = len(file.variables)
-            for idx, (key, value) in enumerate(file.variables.items()):
-                if value.selected:
-                    if "-" in key:
-                        base_key, i = key.split("-")
+            for idx, var in enumerate(file.variables):
+                var_name = var.var_name
+                if var.selected:
+                    if "-" in var_name:
+                        base_key, i = var_name.split("-")
                         name = f"{base_key}-{i}"
                         arr = sim[base_key][:, int(i)]
                     else:
-                        name = key
-                        arr = sim[key]
+                        name = var_name
+                        arr = sim[var_name]
                     if progress_callback:
                         progress_callback((idx + 1) / total)
                     yield pl.Series(name=name, values=arr, dtype=dtype)
@@ -77,28 +77,24 @@ def pynbody_to_dataframe(path, file: FileRead, family=None, progress_callback=No
 
 
 def filter_dataframe(df: pl.DataFrame, file: FileRead) -> pl.DataFrame:
-    # TODO: conversion from old ConfigProcessRead to FileRead
     filtered_df: pl.DataFrame = df.clone()
 
-    for var_name, var_config in file.variables.items():
-        if var_config.selected and var_config.thr_min_sel and var_config.thr_max_sel:
+    for var in file.variables:
+        if var.selected and var.thr_min_sel and var.thr_max_sel:
             filtered_df = filtered_df.filter(
-                pl.col(var_name).is_between(
-                    var_config.thr_min_sel, var_config.thr_max_sel
-                )
+                pl.col(var.var_name).is_between(var.thr_min_sel, var.thr_max_sel)
             )
 
     return filtered_df
 
 
 def convertToDataframe(
-    path: str, file: FileRead, family=None, progress_callback=None
+    file: FileRead, family=None, progress_callback=None
 ) -> pl.DataFrame:
-    # TODO: conversion from old ConfigProcessRead to FileRead
-    if getFileType(path) == "fits":
-        df = fits_to_dataframe(path, file, progress_callback)
+    if getFileType(file.file_path) == "fits":
+        df = fits_to_dataframe(file, progress_callback)
 
     else:
-        df = pynbody_to_dataframe(path, file, family, progress_callback)
+        df = pynbody_to_dataframe(file, family, progress_callback)
 
     return filter_dataframe(df, file)
