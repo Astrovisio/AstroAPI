@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from api.deps import FileServiceDep, ProcessJobServiceDep, ProjectServiceDep
 from api.models import (
@@ -69,16 +69,36 @@ def read_file(*, project_id: int, file_id: int, service: FileServiceDep):
 def update_file(
     *, project_id: int, file_id: int, file_data: FileUpdate, service: FileServiceDep
 ):
-    """Replace all files in a project"""
+    """Update a file in a project"""
     return service.update_file(
         project_id=project_id, file_id=file_id, file_update=file_data
     )
 
 
-# Processing operations
+@router.get("/{project_id}/file/{file_id}/process")
+def processed_project(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get processed file"""
+
+    file = service.get_cached_file(project_id=project_id, file_id=file_id)
+    if not file:
+        return Response(
+            content="File not found", status_code=404, media_type="text/plain"
+        )
+    if not file.processed:
+        return Response(
+            content="File not processed yet",
+            status_code=400,
+            media_type="text/plain",
+        )
+
+    with open(file.processed_path, "rb") as f:
+        data = f.read()
+    return Response(content=data, media_type="application/octet-stream")
+
+
 @router.post("/{project_id}/file/{file_id}/process")
 def process_project(*, project_id: int, file_id: int, service: ProcessJobServiceDep):
-    """Start processing a project"""
+    """Start processing a file"""
 
     job_id = service.start_file_processing(project_id=project_id, file_id=file_id)
 

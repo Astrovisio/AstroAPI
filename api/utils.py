@@ -48,7 +48,7 @@ class DataProcessor:
         for file_path in file_paths:
             file_type = "hdf5" if file_path.endswith(".hdf5") else "fits"
             file = FileCreate(file_type=file_type, file_path=file_path)
-            variables = gets.getThresholds(file_path)
+            variables = gets.getThresholds(file)
             for key, value in variables.items():
                 value.thr_min_sel = value.thr_min
                 value.thr_max_sel = value.thr_max

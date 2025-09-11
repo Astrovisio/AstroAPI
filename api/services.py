@@ -176,12 +176,6 @@ class ProjectService:
             if field != "files":
                 setattr(db_project, field, value)
 
-        # if project_update.files:
-        #     variable_service = VariableService(self.session)
-        #     variable_service.update_project_variable_configs(
-        #         project_id, project_update.files
-        #     )
-
         self.session.commit()
         return self.get_project(project_id)
 
@@ -216,6 +210,12 @@ class FileService:
         if not db_file:
             raise FileNotFoundError(file_id=file_id)
 
+        db_project = self.session.get(Project, project_id)
+        if not db_project:
+            raise ProjectNotFoundError(project_id=project_id)
+        db_project.last_opened = datetime.utcnow()
+        self.session.commit()
+
         file_read = FileRead.model_validate(db_file)
 
         variable_service = VariableService(self.session)
@@ -243,6 +243,14 @@ class FileService:
         db_file = self.session.get(File, file_id)
         if not db_file:
             raise FileNotFoundError(file_id=file_id)
+        db_file.processed = False
+        os.remove(db_file.processed_path) if db_file.processed_path else None
+        db_file.processed_path = None
+
+        db_project = self.session.get(Project, project_id)
+        if not db_project:
+            raise ProjectNotFoundError(project_id=project_id)
+        db_project.last_opened = datetime.utcnow()
 
         if "downsampling" in file_update.model_dump(exclude_unset=True):
             if file_update.downsampling <= 0 or file_update.downsampling > 1:
@@ -277,31 +285,14 @@ class FileService:
 
         return file_read
 
-    def update_file_processing_status(
-        self, file_id: int, processed: bool, processed_file_path: Optional[str] = None
-    ) -> Optional[FileRead]:
-        """Update file processing status and cache path."""
-        db_file = self.session.get(File, file_id)
-        if not db_file:
-            raise FileNotFoundError(file_id=file_id)
-
-        db_file.processed = processed
-        if processed_file_path:
-            db_file.processed_file_path = processed_file_path
-
-        self.session.commit()
-        self.session.refresh(db_file)
-        return FileRead.model_validate(db_file)
-
-    def get_cached_file(self, file_path: str) -> Optional[FileRead]:
-        """Check if file is already processed and return cached version."""
+    def get_cached_file(self, project_id: int, file_id: int) -> FileRead:
+        """Check if file is already processed and return it."""
         db_file = self.session.exec(
-            select(File).where(
-                File.file_path == file_path,
-                File.processed is True,
-                File.processed_file_path.is_not(None),
-            )
+            select(File)
+            .join(FileProjectLink)
+            .where(File.id == file_id, FileProjectLink.project_id == project_id)
         ).first()
+        print(db_file, flush=True)
 
         return FileRead.model_validate(db_file) if db_file else None
 
@@ -378,41 +369,6 @@ class FileService:
 class VariableService:
     def __init__(self, session: Session):
         self.session = session
-
-    def update_variable_selection(
-        self, variable_id: int, selected: bool, **kwargs
-    ) -> Optional[VariableRead]:
-        """Update variable selection and other properties."""
-        db_variable = self.session.get(Variable, variable_id)
-        if not db_variable:
-            raise VariableNotFoundError(variable_id=variable_id)
-
-        db_variable.selected = selected
-        for key, value in kwargs.items():
-            if hasattr(db_variable, key):
-                setattr(db_variable, key, value)
-
-        self.session.commit()
-        self.session.refresh(db_variable)
-        return VariableRead.model_validate(db_variable)
-
-    def bulk_update_variables(self, updates: List[dict]) -> List[VariableRead]:
-        """Bulk update multiple variables."""
-        updated_vars = []
-
-        for update in updates:
-            var_id = update.pop("id")
-            db_variable = self.session.get(Variable, var_id)
-            if db_variable:
-                for key, value in update.items():
-                    if hasattr(db_variable, key):
-                        setattr(db_variable, key, value)
-                updated_vars.append(db_variable)
-            if not db_variable:
-                raise VariableNotFoundError(variable_id=var_id)
-
-        self.session.commit()
-        return [VariableRead.model_validate(var) for var in updated_vars]
 
     def update_file_variable_configs(
         self, project_id: int, file_id: int, file_data: FileUpdate
@@ -559,16 +515,13 @@ class ProcessJobService:
                     progress = round(progress, 2)
                     self._update_job_progress(job_id, progress)
 
-                # Update job status to processing
                 self._update_job_status(job_id, "processing")
 
-                # Process the single file
                 processed_file_data = data_processor.process_data(
                     file_config=file_data,
                     progress_callback=progress_callback,
                 )
 
-                # Save the processed file
                 result_path = f"./data/astrovisio_files/project_{project_id}_file_{file_data.id}_processed.msgpack"
 
                 data_dict = {
@@ -577,11 +530,9 @@ class ProcessJobService:
                 }
                 binary_data = msgpack.packb(data_dict, use_bin_type=True)
 
-                os.makedirs(os.path.dirname(result_path), exist_ok=True)
                 with open(result_path, "wb") as f:
                     f.write(binary_data)
 
-                # Update the file's processed status and path in the database
                 with SessionLocal() as update_session:
                     db_file = update_session.get(File, file_data.id)
                     if db_file:

@@ -3,7 +3,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from api.models import VariableBase
+from api.models import FileCreate, VariableBase
 from src.loaders import load_data
 from src.processors import fits_to_dataframe
 from src.utils import getFileType
@@ -32,13 +32,13 @@ def getKeys(path: str, family=None) -> list:
         return keys
 
 
-def getThresholds(path: str, family=None) -> Dict[str, VariableBase]:
+def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
 
     res = {}
 
-    if getFileType(path) == "fits":
+    if getFileType(file.file_path) == "fits":
 
-        cube = fits_to_dataframe(path)
+        cube = fits_to_dataframe(file)
 
         res["x"] = VariableBase(
             var_name="x",
@@ -94,7 +94,7 @@ def getThresholds(path: str, family=None) -> Dict[str, VariableBase]:
                     )
                     yield key, res
 
-        with load_data(path) as sim:
+        with load_data(file.file_path) as sim:
             sim.physical_units()
 
             res = dict(compute_thresholds(sim))
