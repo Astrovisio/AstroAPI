@@ -11,7 +11,7 @@ from src.utils import getFileType
 def fits_to_dataframe(file: FileRead = None, progress_callback=None):
 
     # Load the spectral cube
-    with load_data(file.file_path) as obs:
+    with load_data(file.path) as obs:
         table = Table(obs[0].data)
 
         def expand_table(table, progress_callback=None):
@@ -37,14 +37,14 @@ def fits_to_dataframe(file: FileRead = None, progress_callback=None):
     del obs
     gc.collect()
 
-    if file and file.downsampling < 1.0:
+    if file and "downsampling" in file.model_dump():
         df = df.sample(fraction=file.downsampling)
 
     return df
 
 
 def pynbody_to_dataframe(file: FileRead, family=None, progress_callback=None):
-    with load_data(file.file_path) as sim:
+    with load_data(file.path) as sim:
 
         sim.physical_units()
 
@@ -70,7 +70,7 @@ def pynbody_to_dataframe(file: FileRead, family=None, progress_callback=None):
     del sim
     gc.collect()
 
-    if file and file.downsampling < 1.0:
+    if file and "downsampling" in file.model_dump():
         df = df.sample(fraction=file.downsampling)
 
     return df
@@ -91,7 +91,7 @@ def filter_dataframe(df: pl.DataFrame, file: FileRead) -> pl.DataFrame:
 def convertToDataframe(
     file: FileRead, family=None, progress_callback=None
 ) -> pl.DataFrame:
-    if getFileType(file.file_path) == "fits":
+    if getFileType(file.path) == "fits":
         df = fits_to_dataframe(file, progress_callback)
 
     else:

@@ -41,7 +41,7 @@ class ProjectService:
         Create a project with files and their variables in one transaction.
         Implements caching - reuses existing processed files.
         """
-        file_variables_map = data_processor.read_data(project_data.file_paths)
+        file_variables_map = data_processor.read_data(project_data.paths)
 
         db_project = Project(
             name=project_data.name,
@@ -53,7 +53,7 @@ class ProjectService:
 
         file_service = FileService(self.session)
         file_service.add_files_to_project(
-            db_project.id, project_data.file_paths, file_variables_map
+            db_project.id, project_data.paths, file_variables_map
         )
 
         self.session.commit()
@@ -75,8 +75,9 @@ class ProjectService:
         temp_project_read = ProjectRead.model_validate(project)
 
         variable_service = VariableService(self.session)
+        file_service = FileService(self.session)
         for file in project.files:
-            variable_service.get_file_variable_configs(project.id, file.id)
+            file_config = file_service.get_file(project.id, file.id)
             for var in file.variables:
                 cfg = self.session.exec(
                     select(ProjectFileVariableConfig).where(
@@ -87,13 +88,16 @@ class ProjectService:
                 ).first()
                 for i, f in enumerate(temp_project_read.files):
                     if f.id == file.id:
+                        f.downsampling = file_config.downsampling
+                        f.processed = file_config.processed
+                        f.processed_path = file_config.processed_path
                         for j, v in enumerate(f.variables):
                             if v.var_name == var.var_name:
                                 temp_project_read.files[i].variables[j] = (
                                     variable_service.build_variable_read(var, cfg)
                                 )
 
-        return temp_project_read
+        return ProjectRead.model_validate(temp_project_read)
 
     def get_projects(self) -> List[ProjectRead]:
         """Get all projects with files and variables loaded."""
@@ -104,8 +108,10 @@ class ProjectService:
         projects = self.session.exec(statement).all()
         pjs = [ProjectRead.model_validate(p) for p in projects]
         variable_service = VariableService(self.session)
+        file_service = FileService(self.session)
         for project in projects:
             for file in project.files:
+                file_config = file_service.get_file(project.id, file.id)
                 variable_service.get_file_variable_configs(project.id, file.id)
                 for var in file.variables:
                     cfg = self.session.exec(
@@ -119,6 +125,9 @@ class ProjectService:
                         next(p for p in pjs if p.id == project.id).files
                     ):
                         if f.id == file.id:
+                            f.downsampling = file_config.downsampling
+                            f.processed = file_config.processed
+                            f.processed_path = file_config.processed_path
                             for j, v in enumerate(f.variables):
                                 if v.var_name == var.var_name:
                                     next(p for p in pjs if p.id == project.id).files[
@@ -139,7 +148,7 @@ class ProjectService:
         if not db_project:
             raise ProjectNotFoundError(project_id)
 
-        current_file_paths = {f.file_path for f in db_project.files}
+        current_file_paths = {f.path for f in db_project.files}
         new_file_paths_set = set(new_file_paths)
 
         # Files to remove
@@ -190,6 +199,57 @@ class ProjectService:
         self.session.delete(db_project)
         self.session.commit()
 
+    def duplicate_project(self, project_id: int) -> ProjectRead:
+        """Duplicate a project along with its files and variable configurations."""
+        db_project = self.session.get(Project, project_id)
+        if not db_project:
+            raise ProjectNotFoundError(project_id)
+
+        new_project = Project(
+            name=f"{db_project.name} (Copy)",
+            favourite=db_project.favourite,
+            description=db_project.description,
+            last_opened=datetime.utcnow(),
+        )
+        self.session.add(new_project)
+        self.session.flush()
+
+        for file in db_project.files:
+            new_link = FileProjectLink(
+                project_id=new_project.id,
+                file_id=file.id,
+            )
+            self.session.add(new_link)
+
+            variables = self.session.exec(
+                select(Variable).where(Variable.file_id == file.id)
+            ).all()
+            for var in variables:
+                existing_cfg = self.session.exec(
+                    select(ProjectFileVariableConfig).where(
+                        ProjectFileVariableConfig.project_id == db_project.id,
+                        ProjectFileVariableConfig.file_id == file.id,
+                        ProjectFileVariableConfig.variable_id == var.id,
+                    )
+                ).first()
+                if existing_cfg:
+                    new_cfg = ProjectFileVariableConfig(
+                        project_id=new_project.id,
+                        file_id=file.id,
+                        variable_id=var.id,
+                        thr_min_sel=existing_cfg.thr_min_sel,
+                        thr_max_sel=existing_cfg.thr_max_sel,
+                        selected=existing_cfg.selected,
+                        x_axis=existing_cfg.x_axis,
+                        y_axis=existing_cfg.y_axis,
+                        z_axis=existing_cfg.z_axis,
+                    )
+                    self.session.add(new_cfg)
+
+        self.session.commit()
+        self.session.refresh(new_project)
+        return self.get_project(new_project.id)
+
 
 class FileService:
     def __init__(self, session: Session):
@@ -197,8 +257,14 @@ class FileService:
 
     def get_file(self, project_id: int, file_id: int) -> FileRead:
         """Get a single file in a project with its variable configurations."""
+        db_project = self.session.get(Project, project_id)
+        if not db_project:
+            raise ProjectNotFoundError(project_id=project_id)
+        db_project.last_opened = datetime.utcnow()
+        self.session.commit()
+
         db_file = self.session.exec(
-            select(File)
+            select(File, FileProjectLink)
             .options(selectinload(File.variables))
             .join(FileProjectLink)
             .where(
@@ -210,16 +276,14 @@ class FileService:
         if not db_file:
             raise FileNotFoundError(file_id=file_id)
 
-        db_project = self.session.get(Project, project_id)
-        if not db_project:
-            raise ProjectNotFoundError(project_id=project_id)
-        db_project.last_opened = datetime.utcnow()
-        self.session.commit()
-
-        file_read = FileRead.model_validate(db_file)
+        file_obj, file_project_link_obj = db_file
+        file_read = FileRead.model_validate(file_obj)
+        file_read.processed = file_project_link_obj.processed
+        file_read.downsampling = file_project_link_obj.downsampling
+        file_read.processed_path = file_project_link_obj.processed_path
 
         variable_service = VariableService(self.session)
-        for var in db_file.variables:
+        for var in file_obj.variables:
             cfg = self.session.exec(
                 select(ProjectFileVariableConfig).where(
                     ProjectFileVariableConfig.project_id == project_id,
@@ -243,9 +307,15 @@ class FileService:
         db_file = self.session.get(File, file_id)
         if not db_file:
             raise FileNotFoundError(file_id=file_id)
-        db_file.processed = False
-        os.remove(db_file.processed_path) if db_file.processed_path else None
-        db_file.processed_path = None
+        file_config = self.session.exec(
+            select(FileProjectLink).where(
+                FileProjectLink.project_id == project_id,
+                FileProjectLink.file_id == file_id,
+            )
+        ).first()
+        file_config.processed = False
+        os.remove(file_config.processed_path) if file_config.processed_path else None
+        file_config.processed_path = None
 
         db_project = self.session.get(Project, project_id)
         if not db_project:
@@ -256,7 +326,7 @@ class FileService:
             if file_update.downsampling <= 0 or file_update.downsampling > 1:
                 raise ValueError("Downsampling must be between 0 (exclusive) and 1.")
 
-            db_file.downsampling = file_update.downsampling
+            file_config.downsampling = file_update.downsampling
 
         if file_update.variables:
             variable_service = VariableService(self.session)
@@ -266,7 +336,11 @@ class FileService:
 
         self.session.commit()
         self.session.refresh(db_file)
+        self.session.refresh(file_config)
         file_read = FileRead.model_validate(db_file)
+        file_read.processed = file_config.processed
+        file_read.downsampling = file_config.downsampling
+        file_read.processed_path = file_config.processed_path
 
         variable_service = VariableService(self.session)
         for var in db_file.variables:
@@ -283,25 +357,28 @@ class FileService:
                         var, cfg
                     )
 
-        return file_read
+        return FileRead.model_validate(file_read)
 
     def get_cached_file(self, project_id: int, file_id: int) -> FileRead:
         """Check if file is already processed and return it."""
         db_file = self.session.exec(
-            select(File)
+            select(File, FileProjectLink)
             .join(FileProjectLink)
             .where(File.id == file_id, FileProjectLink.project_id == project_id)
         ).first()
-        print(db_file, flush=True)
 
-        return FileRead.model_validate(db_file) if db_file else None
+        file_read = FileRead.model_validate(db_file[0])
+        file_read.processed = db_file[1].processed
+        file_read.downsampling = db_file[1].downsampling
+        file_read.processed_path = db_file[1].processed_path
+        return file_read
 
     def remove_files_from_project(
         self, project_id: int, file_paths_to_remove: List[str]
     ) -> None:
         """Remove file-project links and orphaned files."""
         files_to_remove = self.session.exec(
-            select(File).where(File.file_path.in_(file_paths_to_remove))
+            select(File).where(File.path.in_(file_paths_to_remove))
         ).all()
 
         for db_file in files_to_remove:
@@ -330,7 +407,7 @@ class FileService:
         """Add new files to project with their variables."""
         for file_path in new_file_paths:
             existing_file = self.session.exec(
-                select(File).where(File.file_path == file_path)
+                select(File).where(File.path == file_path)
             ).first()
 
             if existing_file:
@@ -338,8 +415,8 @@ class FileService:
             else:
                 file_type = "hdf5" if file_path.endswith(".hdf5") else "fits"
                 db_file = File(
-                    file_type=file_type,
-                    file_path=file_path,
+                    type=file_type,
+                    path=file_path,
                 )
                 self.session.add(db_file)
                 self.session.flush()
@@ -534,11 +611,15 @@ class ProcessJobService:
                     f.write(binary_data)
 
                 with SessionLocal() as update_session:
-                    db_file = update_session.get(File, file_data.id)
-                    if db_file:
-                        db_file.processed = True
-                        db_file.processed_path = result_path
-                        update_session.commit()
+                    statement = select(FileProjectLink).where(
+                        FileProjectLink.project_id == project_id,
+                        FileProjectLink.file_id == file_data.id,
+                    )
+                    file_link = update_session.exec(statement).first()
+                    file_link.processed = True
+                    file_link.processed_path = result_path
+                    update_session.add(file_link)
+                    update_session.commit()
 
                 self._update_job_completion(job_id, result_path)
 

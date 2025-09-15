@@ -49,13 +49,19 @@ def remove_project(*, project_id: int, service: ProjectServiceDep):
     return {"message": "Project deleted successfully"}
 
 
+@router.post("/{project_id}/duplicate", response_model=ProjectRead)
+def duplicate_project(*, project_id: int, service: ProjectServiceDep):
+    """Delete a project"""
+    return service.duplicate_project(project_id)
+
+
 @router.put("/{project_id}/files", response_model=ProjectRead)
 def replace_project_files(
     *, project_id: int, files_update: ProjectFilesUpdate, service: ProjectServiceDep
 ):
     """Replace all files in a project"""
     return service.replace_project_files(
-        project_id=project_id, new_file_paths=files_update.file_paths
+        project_id=project_id, new_file_paths=files_update.paths
     )
 
 

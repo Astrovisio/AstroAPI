@@ -7,7 +7,7 @@ from sqlmodel import SQLModel
 
 from api.exceptions import InvalidFileExtensionError, MixedFileTypesError
 
-from .file import FileRead, FileUpdate
+from .file import FileRead
 
 
 class ProjectBase(SQLModel):
@@ -17,9 +17,9 @@ class ProjectBase(SQLModel):
 
 
 class ProjectCreate(ProjectBase):
-    file_paths: List[str] = []
+    paths: List[str] = []
 
-    @field_validator("file_paths")
+    @field_validator("paths")
     @classmethod
     def validate_file_paths(cls, v: List[str]) -> List[str]:
         if not v:
@@ -59,9 +59,9 @@ class ProjectUpdate(ProjectBase):
 class ProjectFilesUpdate(SQLModel):
     """Replace all files in a project"""
 
-    file_paths: List[str]
+    paths: List[str]
 
-    @field_validator("file_paths")
+    @field_validator("paths")
     @classmethod
     def validate_file_paths(cls, v: List[str]) -> List[str]:
         if not v:

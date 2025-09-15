@@ -5,8 +5,13 @@ services:
     build: .
     ports:
       - "8000:8000"
+    networks:
+      - astronw
     volumes:
       - ${VOLUME_SOURCE}/astrodata:/app/data
 
 volumes:
   astrodata:
+
+networks:
+  astronw:

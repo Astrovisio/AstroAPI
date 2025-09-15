@@ -14,6 +14,9 @@ class FileProjectLink(SQLModel, table=True):
     file_id: Optional[int] = Field(
         default=None, foreign_key="file.id", primary_key=True
     )
+    processed: bool = False
+    downsampling: float = 1.0
+    processed_path: Optional[str] = None
 
 
 class Variable(SQLModel, table=True):
@@ -43,7 +46,7 @@ class ProjectFileVariableConfig(SQLModel, table=True):
 
 class File(FileBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    file_path: str = Field(index=True, unique=True)
+    path: str = Field(index=True, unique=True)
 
     # Relationships
     projects: List["Project"] = Relationship(

@@ -1,8 +1,6 @@
 import gc
 from typing import Dict, List
 
-import numpy as np
-
 from api.models import FileCreate, VariableBase
 from src.loaders import load_data
 from src.processors import fits_to_dataframe
@@ -36,7 +34,7 @@ def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
 
     res = {}
 
-    if getFileType(file.file_path) == "fits":
+    if getFileType(file.path) == "fits":
 
         cube = fits_to_dataframe(file)
 
@@ -94,7 +92,7 @@ def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
                     )
                     yield key, res
 
-        with load_data(file.file_path) as sim:
+        with load_data(file.path) as sim:
             sim.physical_units()
 
             res = dict(compute_thresholds(sim))
