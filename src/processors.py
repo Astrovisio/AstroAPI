@@ -3,15 +3,15 @@ import gc
 import polars as pl
 from astropy.table import Table
 
-from api.models import ConfigProcessRead
+from api.models import FileRead
 from src.loaders import load_data
 from src.utils import getFileType
 
 
-def fits_to_dataframe(path, config: ConfigProcessRead = None, progress_callback=None):
+def fits_to_dataframe(file: FileRead = None, progress_callback=None):
 
     # Load the spectral cube
-    with load_data(path) as obs:
+    with load_data(file.path) as obs:
         table = Table(obs[0].data)
 
         def expand_table(table, progress_callback=None):
@@ -37,67 +37,64 @@ def fits_to_dataframe(path, config: ConfigProcessRead = None, progress_callback=
     del obs
     gc.collect()
 
-    if config and hasattr(config, "downsampling"):
-        df = df.sample(fraction=config.downsampling)
+    if file and "downsampling" in file.model_dump():
+        df = df.sample(fraction=file.downsampling)
 
     return df
 
 
-def pynbody_to_dataframe(
-    path, config: ConfigProcessRead, family=None, progress_callback=None
-):
-    with load_data(path) as sim:
+def pynbody_to_dataframe(file: FileRead, family=None, progress_callback=None):
+    with load_data(file.path) as sim:
 
         sim.physical_units()
 
-        def variable_series(sim, config, progress_callback=None):
+        def variable_series(sim, file, progress_callback=None):
             dtype = pl.Float32
-            total = len(config.variables)
-            for idx, (key, value) in enumerate(config.variables.items()):
-                if value.selected:
-                    if "-" in key:
-                        base_key, i = key.split("-")
+            total = len(file.variables)
+            for idx, var in enumerate(file.variables):
+                var_name = var.var_name
+                if var.selected:
+                    if "-" in var_name:
+                        base_key, i = var_name.split("-")
                         name = f"{base_key}-{i}"
                         arr = sim[base_key][:, int(i)]
                     else:
-                        name = key
-                        arr = sim[key]
+                        name = var_name
+                        arr = sim[var_name]
                     if progress_callback:
                         progress_callback((idx + 1) / total)
                     yield pl.Series(name=name, values=arr, dtype=dtype)
 
-        df = pl.DataFrame(variable_series(sim, config, progress_callback))
+        df = pl.DataFrame(variable_series(sim, file, progress_callback))
 
     del sim
     gc.collect()
 
-    if config and hasattr(config, "downsampling"):
-        df = df.sample(fraction=config.downsampling)
+    if file and "downsampling" in file.model_dump():
+        df = df.sample(fraction=file.downsampling)
 
     return df
 
 
-def filter_dataframe(df: pl.DataFrame, config: ConfigProcessRead) -> pl.DataFrame:
+def filter_dataframe(df: pl.DataFrame, file: FileRead) -> pl.DataFrame:
     filtered_df: pl.DataFrame = df.clone()
 
-    for var_name, var_config in config.variables.items():
-        if var_config.selected and var_config.thr_min_sel and var_config.thr_max_sel:
+    for var in file.variables:
+        if var.selected and var.thr_min_sel and var.thr_max_sel:
             filtered_df = filtered_df.filter(
-                pl.col(var_name).is_between(
-                    var_config.thr_min_sel, var_config.thr_max_sel
-                )
+                pl.col(var.var_name).is_between(var.thr_min_sel, var.thr_max_sel)
             )
 
     return filtered_df
 
 
 def convertToDataframe(
-    path, config: ConfigProcessRead, family=None, progress_callback=None
+    file: FileRead, family=None, progress_callback=None
 ) -> pl.DataFrame:
-    if getFileType(path) == "fits":
-        df = fits_to_dataframe(path, config, progress_callback)
+    if getFileType(file.path) == "fits":
+        df = fits_to_dataframe(file, progress_callback)
 
     else:
-        df = pynbody_to_dataframe(path, config, family, progress_callback)
+        df = pynbody_to_dataframe(file, family, progress_callback)
 
-    return filter_dataframe(df, config)
+    return filter_dataframe(df, file)

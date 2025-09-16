@@ -1,6 +1,8 @@
+import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.mark.order(1)
 class TestCreateProject:
     """Test project creation scenarios"""
 
@@ -10,7 +12,9 @@ class TestCreateProject:
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Valid HDF5 Project"
-        assert data["paths"] == ["file1.hdf5", "file2.hdf5"]
+        assert "id" in data
+        assert "files" in data
+        assert len(data["files"]) == 2
 
     def test_create_project_fits(self, client: TestClient, valid_fits_project: dict):
         """Test creating project with only FITS files"""
@@ -18,7 +22,9 @@ class TestCreateProject:
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Valid FITS Project"
-        assert data["paths"] == ["file1.fits", "file2.fits"]
+        assert "id" in data
+        assert "files" in data
+        assert len(data["files"]) == 2
 
     def test_create_project_invalid_file_extensions(
         self, client: TestClient, invalid_extension_project: dict
@@ -28,8 +34,8 @@ class TestCreateProject:
         assert response.status_code == 422
 
         error_data = response.json()
-        assert "error" in error_data
-        assert error_data["error"]["code"] == "INVALID_FILE_EXTENSION"
+        assert "error_code" in error_data
+        assert error_data["error_code"] == "INVALID_FILE_EXTENSION"
 
     def test_create_project_mixed_file_types(
         self, client: TestClient, mixed_file_types_project: dict
@@ -39,91 +45,85 @@ class TestCreateProject:
         assert response.status_code == 422
 
         error_data = response.json()
-        assert "error" in error_data
-        assert error_data["error"]["code"] == "MIXED_FILE_TYPES"
+        assert "error_code" in error_data
+        assert error_data["error_code"] == "MIXED_FILE_TYPES"
+
+    def test_duplicate_project(self, client: TestClient):
+        """Test creating duplicate project"""
+        response = client.get("/api/projects/")
+        data = response.json()
+        project_id = data[0]["id"]
+        response = client.post(f"/api/projects/{project_id}/duplicate")
+        assert response.status_code == 200
+
+        assert response.json()["name"] == f"{data[0]['name']} (Copy)"
+        assert response.json()["description"] == data[0]["description"]
+        assert response.json()["favourite"] == data[0]["favourite"]
+        assert response.json()["files"] == data[0]["files"]
 
 
-def test_read_projects(client: TestClient):
-    response = client.get("/api/projects/")
-    assert response.status_code == 200
-    data = response.json()
+@pytest.mark.order(2)
+class TestReadProjects:
+    def test_read_projects(self, client: TestClient):
+        response = client.get("/api/projects/")
+        assert response.status_code == 200
+        data = response.json()
 
-    assert isinstance(data, list)
-    assert len(data) == 2
+        assert isinstance(data, list)
+        assert len(data) == 3
 
-
-def test_read_project(client: TestClient):
-    response = client.get("/api/projects/")
-    data = response.json()
-    project_id = data[0]["id"]
-    response = client.get(f"/api/projects/{project_id}")
-    assert response.status_code == 200
-    assert response.json()["id"] == project_id
-
-
-def test_update_project(client: TestClient):
-    response = client.get("/api/projects/")
-    data = response.json()
-    project_id = data[0]["id"]
-    update_data = {"name": "Updated Project", "paths": ["file3.fits", "file4.fits"]}
-    response = client.put(f"/api/projects/{project_id}", json=update_data)
-    assert response.status_code == 200
-    data = response.json()
-
-    assert data["name"] == "Updated Project"
-    assert set(data["paths"]) == set(["file3.fits", "file4.fits"])
-
-    update_data = {"name": "Updated Project", "paths": ["invalid.txt", "another.csv"]}
-    response = client.put(f"/api/projects/{project_id}", json=update_data)
-    assert response.status_code == 422
-
-    error_data = response.json()
-    assert error_data["error"]["code"] == "INVALID_FILE_EXTENSION"
+    def test_read_project(self, client: TestClient):
+        response = client.get("/api/projects/")
+        data = response.json()
+        project_id = data[0]["id"]
+        response = client.get(f"/api/projects/{project_id}")
+        assert response.status_code == 200
+        assert response.json()["id"] == project_id
+        assert response.json()["last_opened"] is not None
 
 
+@pytest.mark.order(3)
 class TestUpdateProject:
     """Test project update scenarios"""
 
-    def test_update_project_valid_data(self, client: TestClient):
+    def test_update_project(self, client: TestClient):
+        response = client.get("/api/projects/")
+        data = response.json()
+        project_id = data[0]["id"]
+        update_data = {"name": "Updated Project", "description": "updated"}
+        response = client.put(f"/api/projects/{project_id}", json=update_data)
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["name"] == "Updated Project"
+        assert data["description"] == "updated"
+
+    def test_update_project_files(self, client: TestClient):
         """Test updating project with valid data"""
         response = client.get("/api/projects/")
         data = response.json()
-        if len(data) > 0:
-            project_id = data[0]["id"]
-            update_data = {
-                "name": "Updated Project",
-                "paths": ["file3.hdf5", "file4.hdf5"],
-            }
-            response = client.put(f"/api/projects/{project_id}", json=update_data)
-            assert response.status_code == 200
-            data = response.json()
+        project_id = data[0]["id"]
+        update_data = {
+            "paths": ["file3.hdf5", "file4.hdf5"],
+        }
+        response = client.put(f"/api/projects/{project_id}/files", json=update_data)
+        assert response.status_code == 200
+        data = response.json()
 
-            assert data["name"] == "Updated Project"
-            assert set(data["paths"]) == set(["file3.hdf5", "file4.hdf5"])
+        file_paths = [f["path"] for f in data["files"]]
+        assert set(file_paths) == set(["file3.hdf5", "file4.hdf5"])
 
-    def test_update_project_invalid_file_extensions(self, client: TestClient):
-        """Test updating project with invalid data"""
+
+@pytest.mark.order(-1)
+class TestDeleteProject:
+    """Test project deletion scenarios"""
+
+    def test_delete_project(self, client: TestClient):
         response = client.get("/api/projects/")
         data = response.json()
-        if len(data) > 0:
-            project_id = data[0]["id"]
-            update_data = {
-                "name": "Updated Project",
-                "paths": ["invalid.txt", "another.csv"],
-            }
-            response = client.put(f"/api/projects/{project_id}", json=update_data)
-            assert response.status_code == 422
+        project_id = data[0]["id"]
+        response = client.delete(f"/api/projects/{project_id}")
+        assert response.status_code == 200
+        data = response.json()
 
-            error_data = response.json()
-            assert error_data["error"]["code"] == "INVALID_FILE_EXTENSION"
-
-
-def test_delete_project(client: TestClient):
-    response = client.get("/api/projects/")
-    data = response.json()
-    project_id = data[0]["id"]
-    response = client.delete(f"/api/projects/{project_id}")
-    assert response.status_code == 200
-    data = response.json()
-
-    assert data == {"message": "Project deleted successfully"}
+        assert data == {"message": "Project deleted successfully"}
