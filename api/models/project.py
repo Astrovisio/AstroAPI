@@ -85,3 +85,8 @@ class ProjectFilesUpdate(SQLModel):
             raise MixedFileTypesError(list(file_extensions))
 
         return v
+
+
+class ProjectDuplicate(SQLModel):
+    name: str
+    description: str

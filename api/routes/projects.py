@@ -7,6 +7,7 @@ from api.models import (
     FileRead,
     FileUpdate,
     ProjectCreate,
+    ProjectDuplicate,
     ProjectFilesUpdate,
     ProjectRead,
     ProjectUpdate,
@@ -50,9 +51,11 @@ def remove_project(*, project_id: int, service: ProjectServiceDep):
 
 
 @router.post("/{project_id}/duplicate", response_model=ProjectRead)
-def duplicate_project(*, project_id: int, service: ProjectServiceDep):
+def duplicate_project(
+    *, project_id: int, project: ProjectDuplicate, service: ProjectServiceDep
+):
     """Delete a project"""
-    return service.duplicate_project(project_id)
+    return service.duplicate_project(project_id=project_id, project=project)
 
 
 @router.put("/{project_id}/files", response_model=ProjectRead)

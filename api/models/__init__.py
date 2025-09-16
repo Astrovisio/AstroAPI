@@ -7,5 +7,11 @@ from .db import (
     Variable,
 )
 from .file import FileCreate, FileRead, FileUpdate
-from .project import ProjectCreate, ProjectFilesUpdate, ProjectRead, ProjectUpdate
+from .project import (
+    ProjectCreate,
+    ProjectDuplicate,
+    ProjectFilesUpdate,
+    ProjectRead,
+    ProjectUpdate,
+)
 from .variable import VariableBase, VariableRead, VariableUpdate

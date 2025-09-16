@@ -10,6 +10,7 @@ from api.models import (
     FileProjectLink,
     Project,
     ProjectCreate,
+    ProjectDuplicate,
     ProjectFileVariableConfig,
     ProjectRead,
     ProjectUpdate,
@@ -188,16 +189,18 @@ class ProjectService:
         self.session.delete(db_project)
         self.session.commit()
 
-    def duplicate_project(self, project_id: int) -> ProjectRead:
+    def duplicate_project(
+        self, project_id: int, project: ProjectDuplicate
+    ) -> ProjectRead:
         """Duplicate a project along with its files and variable configurations."""
         db_project = self.session.get(Project, project_id)
         if not db_project:
             raise ProjectNotFoundError(project_id)
 
         new_project = Project(
-            name=f"{db_project.name} (Copy)",
-            favourite=db_project.favourite,
-            description=db_project.description,
+            name=project.name,
+            favourite=False,
+            description=project.description,
             last_opened=datetime.utcnow(),
         )
         self.session.add(new_project)

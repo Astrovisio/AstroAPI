@@ -53,12 +53,13 @@ class TestCreateProject:
         response = client.get("/api/projects/")
         data = response.json()
         project_id = data[0]["id"]
-        response = client.post(f"/api/projects/{project_id}/duplicate")
+        pj_data = {"name": "ayy", "description": "duplicate"}
+        response = client.post(f"/api/projects/{project_id}/duplicate", json=pj_data)
         assert response.status_code == 200
 
-        assert response.json()["name"] == f"{data[0]['name']} (Copy)"
-        assert response.json()["description"] == data[0]["description"]
-        assert response.json()["favourite"] == data[0]["favourite"]
+        assert response.json()["name"] == "ayy"
+        assert response.json()["description"] == "duplicate"
+        assert response.json()["favourite"] is False
         assert response.json()["files"] == data[0]["files"]
 
 
