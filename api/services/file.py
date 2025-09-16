@@ -185,7 +185,9 @@ class FileService:
                 file_type = "hdf5" if file_path.endswith(".hdf5") else "fits"
                 db_file = File(
                     type=file_type,
+                    name=file_variables_map[file_path].name,
                     path=file_path,
+                    size=file_variables_map[file_path].size,
                 )
                 self.session.add(db_file)
                 self.session.flush()

@@ -8,7 +8,9 @@ from .variable import VariableBase, VariableRead, VariableUpdate
 
 class FileBase(SQLModel):
     type: str
+    name: str
     path: str
+    size: Optional[int] = None
 
 
 class FileCreate(FileBase):

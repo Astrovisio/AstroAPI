@@ -47,7 +47,11 @@ class DataProcessor:
         mapping_files = {}
         for file_path in file_paths:
             file_type = "hdf5" if file_path.endswith(".hdf5") else "fits"
-            file = FileCreate(type=file_type, path=file_path)
+            file_name = os.path.basename(file_path).split(".")[0]
+            file_size = os.path.getsize(file_path)
+            file = FileCreate(
+                type=file_type, name=file_name, path=file_path, size=file_size
+            )
             variables = gets.getThresholds(file)
             for key, value in variables.items():
                 value.thr_min_sel = value.thr_min
@@ -61,7 +65,7 @@ class DataProcessor:
     def read_data_test(file_paths: List[str]) -> Dict[str, FileCreate]:
         mapping_files = {}
         for file_path in file_paths:
-            file = FileCreate(type="hdf5", path=file_path)
+            file = FileCreate(type="hdf5", name="test", path=file_path, size=1)
             for _ in range(random.randint(1, 3)):
                 file_var = TestVariable()
                 variable = VariableBase(**file_var.model_dump())
