@@ -81,6 +81,7 @@ class ProjectService:
                         f.downsampling = file_config.downsampling
                         f.processed = file_config.processed
                         f.processed_path = file_config.processed_path
+                        f.order = file_config.order
                         for j, v in enumerate(f.variables):
                             if v.var_name == var.var_name:
                                 temp_project_read.files[i].variables[j] = (
@@ -118,6 +119,7 @@ class ProjectService:
                             f.downsampling = file_config.downsampling
                             f.processed = file_config.processed
                             f.processed_path = file_config.processed_path
+                            f.order = file_config.order
                             for j, v in enumerate(f.variables):
                                 if v.var_name == var.var_name:
                                     next(p for p in pjs if p.id == project.id).files[
@@ -127,7 +129,7 @@ class ProjectService:
                                     ] = variable_service.build_variable_read(
                                         var, cfg
                                     )
-        return pjs
+        return [ProjectRead.model_validate(p) for p in pjs]
 
     def replace_project_files(
         self, project_id: int, new_file_paths: List[str]
@@ -172,8 +174,20 @@ class ProjectService:
         db_project.last_opened = datetime.utcnow()
 
         for field, value in project_update.model_dump(exclude_unset=True).items():
-            if field != "files":
+            if field != "order":
                 setattr(db_project, field, value)
+            else:
+                fpls = self.session.exec(
+                    select(FileProjectLink).where(
+                        FileProjectLink.project_id == project_id
+                    )
+                ).all()
+                for fpl in fpls:
+                    if fpl.file_id in value:
+                        fpl.order = value.index(fpl.file_id)
+                    else:
+                        fpl.order = None
+                    self.session.add(fpl)
 
         self.session.commit()
         return self.get_project(project_id)

@@ -50,6 +50,7 @@ class FileService:
         file_read.processed = file_project_link_obj.processed
         file_read.downsampling = file_project_link_obj.downsampling
         file_read.processed_path = file_project_link_obj.processed_path
+        file_read.order = file_project_link_obj.order
 
         variable_service = VariableService(self.session)
         for var in file_obj.variables:

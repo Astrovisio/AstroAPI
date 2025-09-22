@@ -51,9 +51,16 @@ class ProjectRead(ProjectBase):
     last_opened: Optional[datetime]
     files: List[FileRead] = []
 
+    @field_validator("files", mode="after")
+    @classmethod
+    def order_files(cls, v, info):
+        """Order files according to the order field"""
+        ordered_files = sorted(v, key=lambda file: (file.order is None, file.order))
+        return ordered_files
+
 
 class ProjectUpdate(ProjectBase):
-    pass
+    order: Optional[List[int]] = None
 
 
 class ProjectFilesUpdate(SQLModel):
