@@ -186,7 +186,7 @@ class ProjectService:
                     if fpl.file_id in value:
                         fpl.order = value.index(fpl.file_id)
                     else:
-                        fpl.order = None
+                        fpl.order = -1
                     self.session.add(fpl)
 
         self.session.commit()

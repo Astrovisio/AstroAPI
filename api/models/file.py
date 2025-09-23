@@ -22,7 +22,7 @@ class FileRead(FileBase):
     processed: Optional[bool] = False
     downsampling: Optional[float] = 1.0
     processed_path: Optional[str] = None
-    order: Optional[int] = None
+    order: Optional[int] = -1
     variables: List[VariableRead] = []
 
 

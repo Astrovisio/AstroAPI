@@ -114,6 +114,29 @@ class TestUpdateProject:
         file_paths = [f["path"] for f in data["files"]]
         assert set(file_paths) == set(["file3.hdf5", "file4.hdf5"])
 
+    def test_update_project_file_order(self, client: TestClient):
+        """Test updating project file order"""
+        response = client.get("/api/projects/")
+        data = response.json()
+        project_id = data[0]["id"]
+        project = data[0]
+
+        file_ids = [f["id"] for f in project["files"]]
+        reversed_file_ids = list(reversed(file_ids))
+
+        update_data = {
+            "name": project["name"],
+            "favourite": project["favourite"],
+            "description": project["description"],
+            "order": reversed_file_ids,
+        }
+        response = client.put(f"/api/projects/{project_id}", json=update_data)
+        assert response.status_code == 200
+        updated_data = response.json()
+
+        updated_file_ids = [f["id"] for f in updated_data["files"]]
+        assert updated_file_ids == reversed_file_ids
+
 
 @pytest.mark.order(-1)
 class TestDeleteProject:

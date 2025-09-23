@@ -17,7 +17,7 @@ class FileProjectLink(SQLModel, table=True):
     processed: bool = False
     downsampling: float = 1.0
     processed_path: Optional[str] = None
-    order: Optional[int] = None
+    order: Optional[int] = -1
 
 
 class Variable(SQLModel, table=True):
