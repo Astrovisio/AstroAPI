@@ -31,6 +31,7 @@ class FileUpdate(FileBase):
     downsampling: Optional[float] = 1.0
     processed_path: Optional[str] = None
     variables: List[VariableUpdate] = []
+    order: Optional[int] = -1
 
     @field_validator("downsampling")
     @classmethod

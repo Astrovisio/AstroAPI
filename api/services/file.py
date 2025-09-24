@@ -86,6 +86,7 @@ class FileService:
         file_config.processed = False
         os.remove(file_config.processed_path) if file_config.processed_path else None
         file_config.processed_path = None
+        file_config.order = file_update.order
 
         db_project = self.session.get(Project, project_id)
         if not db_project:
