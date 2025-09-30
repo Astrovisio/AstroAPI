@@ -1,28 +1,26 @@
-from typing import Optional
+from typing import List, Optional
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import SQLModel
 
 
-class ConfigRenderBase(SQLModel):
-    project_id: int
+class RenderBase(SQLModel):
     var_name: str
-    colormap: str = "Inferno"
-    contrast: float = 1.0
-    saturation: float = 1.0
-    opacity: float = 1.0
-    brightness: float = 1.0
-    shape: str = "square"
+
     thr_min: Optional[float] = None
+    thr_min_sel: Optional[float] = None
     thr_max: Optional[float] = None
+    thr_max_sel: Optional[float] = None
+    scaling: Optional[str] = None
+
+    mapping: Optional[str] = None
+    colormap: Optional[str] = None
+    opacity: Optional[float] = None
+    invert_mapping: Optional[bool] = False
 
 
-class ConfigRender(ConfigRenderBase, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+class RenderUpdate(RenderBase):
+    variables: List[RenderBase] = []
 
 
-class ConfigRenderCreate(ConfigRenderBase):
-    pass
-
-
-class ConfigRenderRead(ConfigRenderBase):
-    id: int
+class RenderRead(RenderBase):
+    variables: List[RenderBase] = []

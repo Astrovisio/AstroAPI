@@ -14,6 +14,8 @@ from api.models import (
     FileUpdate,
     Project,
     ProjectFileVariableConfig,
+    RenderRead,
+    RenderUpdate,
     Variable,
 )
 
@@ -215,3 +217,13 @@ class FileService:
             if not existing_link:
                 link = FileProjectLink(project_id=project_id, file_id=db_file.id)
                 self.session.add(link)
+
+    def get_render(self, project_id: int, file_id: int) -> RenderRead:
+        """Get render settings for a specific file"""
+        pass
+
+    def update_render(
+        self, project_id: int, file_id: int, render_data: RenderUpdate
+    ) -> RenderRead:
+        """Update render settings for a specific file"""
+        pass

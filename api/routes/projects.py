@@ -11,6 +11,9 @@ from api.models import (
     ProjectFilesUpdate,
     ProjectRead,
     ProjectUpdate,
+    RenderRead,
+    RenderSettings,
+    RenderUpdate,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -112,3 +115,19 @@ def process_project(*, project_id: int, file_id: int, service: ProcessJobService
     job_id = service.start_file_processing(project_id=project_id, file_id=file_id)
 
     return {"job_id": job_id}
+
+
+@router.get("/{project_id}/file/{file_id}/render", response_model=RenderRead)
+def get_render(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get render settings for a file in a project"""
+    return service.get_render(project_id=project_id, file_id=file_id)
+
+
+@router.put("/{project_id}/file/{file_id}", response_model=RenderRead)
+def update_render(
+    *, project_id: int, file_id: int, render_data: RenderUpdate, service: FileServiceDep
+):
+    """Update render settings for a file in a project"""
+    return service.update_render(
+        project_id=project_id, file_id=file_id, render_data=render_data
+    )

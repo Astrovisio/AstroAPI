@@ -7,6 +7,38 @@ from .file import FileBase
 from .project import ProjectBase
 
 
+class RenderSettings(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    config_id: int = Field(foreign_key="projectfilevariableconfig.id")
+
+    vis_thr_min: Optional[float] = None
+    vis_thr_max: Optional[float] = None
+    scaling: Optional[float] = 1.0
+
+    mapping: Optional[str] = None
+    colormap: Optional[str] = None
+    opacity: Optional[float] = None
+
+    # Relationship
+    config: "ProjectFileVariableConfig" = Relationship(back_populates="render_settings")
+
+
+class ProjectFileVariableConfig(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_id: int = Field(foreign_key="project.id")
+    file_id: int = Field(foreign_key="file.id")
+    variable_id: int = Field(foreign_key="variable.id")
+    thr_min_sel: Optional[float] = None
+    thr_max_sel: Optional[float] = None
+    selected: bool = False
+    x_axis: bool = False
+    y_axis: bool = False
+    z_axis: bool = False
+
+    # Relationship
+    render_settings: Optional["RenderSettings"] = Relationship(back_populates="config")
+
+
 class FileProjectLink(SQLModel, table=True):
     project_id: Optional[int] = Field(
         default=None, foreign_key="project.id", primary_key=True
@@ -30,19 +62,6 @@ class Variable(SQLModel, table=True):
 
     # Relationship
     file: "File" = Relationship(back_populates="variables")
-
-
-class ProjectFileVariableConfig(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: int = Field(foreign_key="project.id")
-    file_id: int = Field(foreign_key="file.id")
-    variable_id: int = Field(foreign_key="variable.id")
-    thr_min_sel: Optional[float] = None
-    thr_max_sel: Optional[float] = None
-    selected: bool = False
-    x_axis: bool = False
-    y_axis: bool = False
-    z_axis: bool = False
 
 
 class File(FileBase, table=True):
