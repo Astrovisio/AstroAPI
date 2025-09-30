@@ -201,6 +201,15 @@ class ProjectService:
             return False
 
         self.session.delete(db_project)
+
+        cfgs = self.session.exec(
+            select(ProjectFileVariableConfig).where(
+                ProjectFileVariableConfig.project_id == project_id
+            )
+        ).all()
+        for cfg in cfgs:
+            self.session.delete(cfg)
+
         self.session.commit()
 
     def duplicate_project(

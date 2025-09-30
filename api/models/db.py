@@ -12,12 +12,16 @@ class RenderSettings(SQLModel, table=True):
     config_id: int = Field(foreign_key="projectfilevariableconfig.id")
 
     vis_thr_min: Optional[float] = None
+    vis_thr_min_sel: Optional[float] = None
     vis_thr_max: Optional[float] = None
-    scaling: Optional[float] = 1.0
+    vis_thr_max_sel: Optional[float] = None
+    scaling: Optional[str] = None
 
     mapping: Optional[str] = None
     colormap: Optional[str] = None
     opacity: Optional[float] = None
+
+    invert_mapping: Optional[bool] = False
 
     # Relationship
     config: "ProjectFileVariableConfig" = Relationship(back_populates="render_settings")

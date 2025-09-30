@@ -14,7 +14,9 @@ from api.models import (
     FileUpdate,
     Project,
     ProjectFileVariableConfig,
+    RenderBase,
     RenderRead,
+    RenderSettings,
     RenderUpdate,
     Variable,
 )
@@ -218,12 +220,103 @@ class FileService:
                 link = FileProjectLink(project_id=project_id, file_id=db_file.id)
                 self.session.add(link)
 
+    def create_render(self, project_id: int, file_id: int) -> None:
+        """Create default render settings for a specific file"""
+        cfgs = self.session.exec(
+            select(ProjectFileVariableConfig).where(
+                ProjectFileVariableConfig.project_id == project_id,
+                ProjectFileVariableConfig.file_id == file_id,
+            )
+        ).all()
+        for cfg in cfgs:
+            render = RenderSettings(
+                config_id=cfg.id,
+                vis_thr_min=cfg.thr_min_sel,
+                vis_thr_max=cfg.thr_max_sel,
+            )
+            self.session.add(render)
+
+        self.session.commit()
+
     def get_render(self, project_id: int, file_id: int) -> RenderRead:
         """Get render settings for a specific file"""
-        pass
+        cfgs = self.session.exec(
+            select(ProjectFileVariableConfig).where(
+                ProjectFileVariableConfig.project_id == project_id,
+                ProjectFileVariableConfig.file_id == file_id,
+                ProjectFileVariableConfig.selected == 1,
+            )
+        ).all()
+        renders = self.session.exec(
+            select(RenderSettings).where(
+                RenderSettings.config_id.in_([cfg.id for cfg in cfgs])
+            )
+        ).all()
+        render_reads = []
+        for render in renders:
+            cfg = next((c for c in cfgs if c.id == render.config_id), None)
+            if cfg:
+                var = self.session.get(Variable, cfg.variable_id)
+                if var:
+                    render_base = RenderBase(
+                        var_name=var.var_name, **render.model_dump()
+                    )
+                    render_reads.append(render_base)
+        return RenderRead(variables=render_reads)
 
     def update_render(
         self, project_id: int, file_id: int, render_data: RenderUpdate
     ) -> RenderRead:
         """Update render settings for a specific file"""
-        pass
+        cfgs = self.session.exec(
+            select(ProjectFileVariableConfig).where(
+                ProjectFileVariableConfig.project_id == project_id,
+                ProjectFileVariableConfig.file_id == file_id,
+                ProjectFileVariableConfig.selected == 1,
+            )
+        ).all()
+        renders = self.session.exec(
+            select(RenderSettings).where(
+                RenderSettings.config_id.in_([cfg.id for cfg in cfgs])
+            )
+        ).all()
+        render_reads = []
+        for variable in render_data.variables:
+            cfg = next(
+                (
+                    c
+                    for c in cfgs
+                    if self.session.get(Variable, c.variable_id).var_name
+                    == variable.var_name
+                ),
+                None,
+            )
+            if not cfg:
+                continue
+            render = next((r for r in renders if r.config_id == cfg.id), None)
+            for key, value in variable.model_dump(exclude={"var_name"}).items():
+                if value is not None:
+                    setattr(render, key, value)
+            self.session.add(render)
+            render_read = RenderBase(var_name=variable.var_name, **render.model_dump())
+            render_reads.append(render_read)
+        self.session.commit()
+        return RenderRead(variables=render_reads)
+
+    def delete_render(self, project_id: int, file_id: int) -> None:
+        """Delete render settings for a specific file"""
+        cfgs = self.session.exec(
+            select(ProjectFileVariableConfig).where(
+                ProjectFileVariableConfig.project_id == project_id,
+                ProjectFileVariableConfig.file_id == file_id,
+                ProjectFileVariableConfig.selected == 1,
+            )
+        ).all()
+        renders = self.session.exec(
+            select(RenderSettings).where(
+                RenderSettings.config_id.in_([cfg.id for cfg in cfgs])
+            )
+        ).all()
+        for render in renders:
+            self.session.delete(render)
+        self.session.commit()

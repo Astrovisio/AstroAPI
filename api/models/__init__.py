@@ -15,5 +15,5 @@ from .project import (
     ProjectRead,
     ProjectUpdate,
 )
-from .render import RenderRead, RenderUpdate
+from .render import RenderBase, RenderRead, RenderUpdate
 from .variable import VariableBase, VariableRead, VariableUpdate
