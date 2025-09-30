@@ -105,13 +105,14 @@ class FileService:
                 project_id, file_id, file_update
             )
 
+        self.session.add(file_config)
         self.session.commit()
-        self.session.refresh(db_file)
         self.session.refresh(file_config)
         file_read = FileRead.model_validate(db_file)
         file_read.processed = file_config.processed
         file_read.downsampling = file_config.downsampling
         file_read.processed_path = file_config.processed_path
+        file_read.order = file_config.order
 
         variable_service = VariableService(self.session)
         for var in db_file.variables:
