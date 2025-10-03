@@ -40,7 +40,9 @@ class ProjectFileVariableConfig(SQLModel, table=True):
     z_axis: bool = False
 
     # Relationship
-    render_settings: Optional["RenderSettings"] = Relationship(back_populates="config")
+    render_settings: Optional["RenderSettings"] = Relationship(
+        back_populates="config", cascade_delete=True
+    )
 
 
 class FileProjectLink(SQLModel, table=True):
