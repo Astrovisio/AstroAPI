@@ -230,6 +230,13 @@ class FileService:
                 ProjectFileVariableConfig.selected == 1,
             )
         ).all()
+        existing_renders = self.session.exec(
+            select(RenderSettings).where(
+                RenderSettings.config_id.in_([cfg.id for cfg in cfgs])
+            )
+        ).all()
+        if existing_renders:
+            return
         for cfg in cfgs:
             render = RenderSettings(
                 config_id=cfg.id,
