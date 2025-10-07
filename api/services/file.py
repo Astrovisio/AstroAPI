@@ -300,8 +300,7 @@ class FileService:
             cfg = cfg_tuple[0]
             render = next((r for r in renders if r.config_id == cfg.id), None)
             for key, value in variable.model_dump(exclude={"var_name"}).items():
-                if value is not None:
-                    setattr(render, key, value)
+                setattr(render, key, value)
             self.session.add(render)
             render_read = RenderBase(var_name=variable.var_name, **render.model_dump())
             render_reads.append(render_read)
