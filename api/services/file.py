@@ -97,11 +97,7 @@ class FileService:
             raise ProjectNotFoundError(project_id=project_id)
         db_project.last_opened = datetime.utcnow()
 
-        if "downsampling" in file_update.model_dump(exclude_unset=True):
-            if file_update.downsampling <= 0 or file_update.downsampling > 1:
-                raise ValueError("Downsampling must be between 0 (exclusive) and 1.")
-
-            file_config.downsampling = file_update.downsampling
+        file_config.downsampling = file_update.downsampling
 
         if file_update.variables:
             variable_service = VariableService(self.session)
