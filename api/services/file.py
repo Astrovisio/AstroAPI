@@ -260,13 +260,19 @@ class FileService:
                 RenderSettings.config_id.in_([cfg[0].id for cfg in cfgs])
             )
         ).all()
+        noise = self.session.exec(
+            select(FileProjectLink.noise).where(
+                FileProjectLink.project_id == project_id,
+                FileProjectLink.file_id == file_id,
+            )
+        ).first()
         render_reads = []
         for render in renders:
             cfg_tuple = next((c for c in cfgs if c[0].id == render.config_id), None)
             if cfg_tuple:
                 render_base = RenderBase(var_name=cfg_tuple[1], **render.model_dump())
                 render_reads.append(render_base)
-        return RenderRead(variables=render_reads)
+        return RenderRead(variables=render_reads, noise=noise)
 
     def update_render(
         self, project_id: int, file_id: int, render_data: RenderUpdate
@@ -286,6 +292,12 @@ class FileService:
                 RenderSettings.config_id.in_([cfg[0].id for cfg in cfgs])
             )
         ).all()
+        noise = self.session.exec(
+            select(FileProjectLink).where(
+                FileProjectLink.project_id == project_id,
+                FileProjectLink.file_id == file_id,
+            )
+        ).first()
         render_reads = []
         for variable in render_data.variables:
             cfg_tuple = next(
@@ -301,8 +313,11 @@ class FileService:
             self.session.add(render)
             render_read = RenderBase(var_name=variable.var_name, **render.model_dump())
             render_reads.append(render_read)
+
+        noise.noise = render_data.noise
+        self.session.add(noise)
         self.session.commit()
-        return RenderRead(variables=render_reads)
+        return RenderRead(variables=render_reads, noise=render_data.noise)
 
     def delete_renders(self, project_id: int, file_id: int) -> None:
         """Delete render settings for a specific file"""
@@ -318,6 +333,14 @@ class FileService:
                 RenderSettings.config_id.in_([cfg.id for cfg in cfgs])
             )
         ).all()
+        noise_link = self.session.exec(
+            select(FileProjectLink).where(
+                FileProjectLink.project_id == project_id,
+                FileProjectLink.file_id == file_id,
+            )
+        ).first()
+        noise_link.noise = 0
+        self.session.add(noise_link)
         for render in renders:
             self.session.delete(render)
         self.session.commit()

@@ -21,6 +21,7 @@ class RenderBase(SQLModel):
 
 class RenderUpdate(SQLModel):
     variables: List[RenderBase] = []
+    noise: Optional[float] = 0
 
     @field_validator("variables")
     @classmethod
@@ -33,3 +34,4 @@ class RenderUpdate(SQLModel):
 
 class RenderRead(SQLModel):
     variables: List[RenderBase] = []
+    noise: Optional[float] = 0
