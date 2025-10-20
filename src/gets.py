@@ -38,6 +38,27 @@ def finite_min_max(series):
     return float(np.nanmin(data)), float(np.nanmax(data))
 
 
+def get_total_points(file: FileCreate) -> int:
+    total_points = 0
+
+    if getFileType(file.path) == "fits":
+
+        cube = fits_to_dataframe(file)
+        total_points = cube.shape[0]
+        del cube
+
+    else:
+
+        with load_data(file.path) as sim:
+            total_points = len(sim)
+
+        del sim
+
+    gc.collect()
+
+    return total_points
+
+
 def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
 
     res = {}

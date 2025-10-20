@@ -53,6 +53,7 @@ class DataProcessor:
                 type=file_type, name=file_name, path=file_path, size=file_size
             )
             variables = gets.getThresholds(file)
+            file.total_points = gets.get_total_points(file)
             for key, value in variables.items():
                 value.thr_min_sel = value.thr_min
                 value.thr_max_sel = value.thr_max

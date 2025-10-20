@@ -192,6 +192,7 @@ class FileService:
                     name=file_variables_map[file_path].name,
                     path=file_path,
                     size=file_variables_map[file_path].size,
+                    total_points=file_variables_map[file_path].total_points,
                 )
                 self.session.add(db_file)
                 self.session.flush()

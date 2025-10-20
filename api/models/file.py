@@ -11,6 +11,7 @@ class FileBase(SQLModel):
     name: str
     path: str
     size: Optional[int] = None
+    total_points: Optional[int] = None
 
 
 class FileCreate(FileBase):
