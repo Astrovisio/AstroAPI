@@ -4,6 +4,7 @@ from .db import (
     ProcessJob,
     Project,
     ProjectFileVariableConfig,
+    RenderSettings,
     Variable,
 )
 from .file import FileCreate, FileRead, FileUpdate
@@ -14,4 +15,5 @@ from .project import (
     ProjectRead,
     ProjectUpdate,
 )
+from .render import RenderBase, RenderRead, RenderUpdate
 from .variable import VariableBase, VariableRead, VariableUpdate

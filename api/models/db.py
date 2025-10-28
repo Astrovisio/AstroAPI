@@ -7,29 +7,24 @@ from .file import FileBase
 from .project import ProjectBase
 
 
-class FileProjectLink(SQLModel, table=True):
-    project_id: Optional[int] = Field(
-        default=None, foreign_key="project.id", primary_key=True
-    )
-    file_id: Optional[int] = Field(
-        default=None, foreign_key="file.id", primary_key=True
-    )
-    processed: bool = False
-    downsampling: float = 1.0
-    processed_path: Optional[str] = None
-    order: Optional[int] = -1
-
-
-class Variable(SQLModel, table=True):
+class RenderSettings(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: int = Field(foreign_key="file.id")
-    var_name: str
-    unit: str
-    thr_min: float = -float("inf")
-    thr_max: float = float("inf")
+    config_id: int = Field(foreign_key="projectfilevariableconfig.id")
+
+    vis_thr_min: Optional[float] = None
+    vis_thr_min_sel: Optional[float] = None
+    vis_thr_max: Optional[float] = None
+    vis_thr_max_sel: Optional[float] = None
+    scaling: Optional[str] = None
+
+    mapping: Optional[str] = None
+    colormap: Optional[str] = None
+    opacity: Optional[float] = None
+
+    invert_mapping: Optional[bool] = False
 
     # Relationship
-    file: "File" = Relationship(back_populates="variables")
+    config: "ProjectFileVariableConfig" = Relationship(back_populates="render_settings")
 
 
 class ProjectFileVariableConfig(SQLModel, table=True):
@@ -43,6 +38,37 @@ class ProjectFileVariableConfig(SQLModel, table=True):
     x_axis: bool = False
     y_axis: bool = False
     z_axis: bool = False
+
+    # Relationship
+    render_settings: Optional["RenderSettings"] = Relationship(
+        back_populates="config", cascade_delete=True
+    )
+
+
+class FileProjectLink(SQLModel, table=True):
+    project_id: Optional[int] = Field(
+        default=None, foreign_key="project.id", primary_key=True
+    )
+    file_id: Optional[int] = Field(
+        default=None, foreign_key="file.id", primary_key=True
+    )
+    processed: bool = False
+    downsampling: float = 1.0
+    processed_path: Optional[str] = None
+    order: Optional[int] = -1
+    noise: Optional[float] = 0
+
+
+class Variable(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    file_id: int = Field(foreign_key="file.id")
+    var_name: str
+    unit: str
+    thr_min: float = -float("inf")
+    thr_max: float = float("inf")
+
+    # Relationship
+    file: "File" = Relationship(back_populates="variables")
 
 
 class File(FileBase, table=True):

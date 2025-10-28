@@ -1,6 +1,8 @@
 import gc
 from typing import Dict, List
 
+import numpy as np
+
 from api.models import FileCreate, VariableBase
 from src.loaders import load_data
 from src.processors import fits_to_dataframe
@@ -30,6 +32,33 @@ def getKeys(path: str, family=None) -> list:
         return keys
 
 
+def finite_min_max(series):
+    data = series.to_numpy()
+    data = data[np.isfinite(data)]
+    return float(np.nanmin(data)), float(np.nanmax(data))
+
+
+def get_total_points(file: FileCreate) -> int:
+    total_points = 0
+
+    if getFileType(file.path) == "fits":
+
+        cube = fits_to_dataframe(file)
+        total_points = cube.shape[0]
+        del cube
+
+    else:
+
+        with load_data(file.path) as sim:
+            total_points = len(sim)
+
+        del sim
+
+    gc.collect()
+
+    return total_points
+
+
 def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
 
     res = {}
@@ -37,31 +66,15 @@ def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
     if getFileType(file.path) == "fits":
 
         cube = fits_to_dataframe(file)
+        thr_min, thr_max = finite_min_max(cube["value"])
 
-        res["x"] = VariableBase(
-            var_name="x",
-            thr_min=float(cube["x"].min()),
-            thr_max=float(cube["x"].max()),
-            unit="x",
-        )
-        res["y"] = VariableBase(
-            var_name="y",
-            thr_min=float(cube["y"].min()),
-            thr_max=float(cube["y"].max()),
-            unit="y",
-        )
-        res["z"] = VariableBase(
-            var_name="z",
-            thr_min=float(cube["z"].min()),
-            thr_max=float(cube["z"].max()),
-            unit="z",
-        )
-        res["value"] = VariableBase(
-            var_name="value",
-            thr_min=float(cube["value"].min()),
-            thr_max=float(cube["value"].max()),
-            unit="value",
-        )
+        for key in ("x", "y", "z", "value"):
+            res[key] = VariableBase(
+                var_name=key,
+                thr_min=thr_min,
+                thr_max=thr_max,
+                unit=key,
+            )
 
         del cube
 
@@ -73,22 +86,26 @@ def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
             keys.remove("pos")
 
             for key in keys:
-                if sim[key].ndim > 1:
-                    for i in range(sim[key].shape[1]):
+                data = sim[key]
+                if data.ndim > 1:
+                    for i in range(data.shape[1]):
+                        subarray = data[:, i]
+                        subarray = subarray[np.isfinite(subarray)]
                         var_name = f"{key}-{i}"
                         res = VariableBase(
                             var_name=var_name,
-                            thr_min=float(sim[key][:, i].min()),
-                            thr_max=float(sim[key][:, i].max()),
-                            unit=str(sim[key].units),
+                            thr_min=float(np.nanmin(subarray)),
+                            thr_max=float(np.nanmax(subarray)),
+                            unit=str(data.units),
                         )
                         yield var_name, res
                 else:
+                    subarray = data[np.isfinite(data)]
                     res = VariableBase(
                         var_name=key,
-                        thr_min=float(sim[key].min()),
-                        thr_max=float(sim[key].max()),
-                        unit=str(sim[key].units),
+                        thr_min=float(np.nanmin(subarray)),
+                        thr_max=float(np.nanmax(subarray)),
+                        unit=str(data.units),
                     )
                     yield key, res
 

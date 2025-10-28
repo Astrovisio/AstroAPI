@@ -11,6 +11,8 @@ from api.models import (
     ProjectFilesUpdate,
     ProjectRead,
     ProjectUpdate,
+    RenderRead,
+    RenderUpdate,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -44,7 +46,7 @@ def update_project(
 
 
 @router.delete("/{project_id}")
-def remove_project(*, project_id: int, service: ProjectServiceDep):
+def delete_project(*, project_id: int, service: ProjectServiceDep):
     """Delete a project"""
     service.delete_project(project_id)
     return {"message": "Project deleted successfully"}
@@ -85,7 +87,7 @@ def update_file(
 
 
 @router.get("/{project_id}/file/{file_id}/process")
-def processed_project(*, project_id: int, file_id: int, service: FileServiceDep):
+def processed_file(*, project_id: int, file_id: int, service: FileServiceDep):
     """Get processed file"""
 
     file = service.get_cached_file(project_id=project_id, file_id=file_id)
@@ -106,9 +108,33 @@ def processed_project(*, project_id: int, file_id: int, service: FileServiceDep)
 
 
 @router.post("/{project_id}/file/{file_id}/process")
-def process_project(*, project_id: int, file_id: int, service: ProcessJobServiceDep):
+def process_file(
+    *,
+    project_id: int,
+    file_id: int,
+    pjservice: ProcessJobServiceDep,
+    fservice: FileServiceDep,
+):
     """Start processing a file"""
 
-    job_id = service.start_file_processing(project_id=project_id, file_id=file_id)
+    job_id = pjservice.start_file_processing(project_id=project_id, file_id=file_id)
+
+    fservice.create_render(project_id=project_id, file_id=file_id)
 
     return {"job_id": job_id}
+
+
+@router.get("/{project_id}/file/{file_id}/render", response_model=RenderRead)
+def get_render(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get render settings for a file in a project"""
+    return service.get_render(project_id=project_id, file_id=file_id)
+
+
+@router.put("/{project_id}/file/{file_id}/render", response_model=RenderRead)
+def update_render(
+    *, project_id: int, file_id: int, render_data: RenderUpdate, service: FileServiceDep
+):
+    """Update render settings for a file in a project"""
+    return service.update_render(
+        project_id=project_id, file_id=file_id, render_data=render_data
+    )
