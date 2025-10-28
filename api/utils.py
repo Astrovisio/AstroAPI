@@ -47,7 +47,7 @@ class DataProcessor:
         mapping_files = {}
         for file_path in file_paths:
             file_type = "hdf5" if file_path.endswith(".hdf5") else "fits"
-            file_name = os.path.basename(file_path).split(".")[0]
+            file_name = os.path.basename(file_path).rsplit(".", 1)[0]
             file_size = os.path.getsize(file_path)
             file = FileCreate(
                 type=file_type, name=file_name, path=file_path, size=file_size
