@@ -31,7 +31,9 @@ class ProjectService:
         Create a project with files and their variables in one transaction.
         Implements caching - reuses existing processed files.
         """
-        file_variables_map = data_processor.read_data(project_data.paths)
+        file_variables_map, file_histos_map = data_processor.read_data(
+            project_data.paths
+        )
 
         db_project = Project(
             name=project_data.name,
@@ -45,6 +47,8 @@ class ProjectService:
         file_service.add_files_to_project(
             db_project.id, project_data.paths, file_variables_map
         )
+
+        file_service.add_histos_to_file(file_histos_map)
 
         self.session.commit()
         self.session.refresh(db_project)

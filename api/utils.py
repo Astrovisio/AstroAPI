@@ -1,12 +1,12 @@
 import logging
 import os
 import random
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import polars as pl
 from sqlmodel import SQLModel
 
-from api.models import FileCreate, FileRead, VariableBase
+from api.models import FileCreate, FileRead, HistoBase, VariableBase
 from src import gets, processors
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,9 @@ class TestVariable(SQLModel):
 class DataProcessor:
 
     @staticmethod
-    def read_data(file_paths: List[str]) -> Dict[str, FileCreate]:
+    def read_data(
+        file_paths: List[str],
+    ) -> Tuple[Dict[str, FileCreate], Dict[str, Dict[str, List[HistoBase]]]]:
         """
         Reads data from given file paths and extracts variables with their thresholds.
         Returns a mapping of file paths to FileCreate objects containing variable info.
@@ -45,6 +47,7 @@ class DataProcessor:
             return DataProcessor.read_data_test(file_paths)
 
         mapping_files = {}
+        mapping_histos = {}
         for file_path in file_paths:
             file_type = "hdf5" if file_path.endswith(".hdf5") else "fits"
             file_name = os.path.basename(file_path).rsplit(".", 1)[0]
@@ -52,15 +55,18 @@ class DataProcessor:
             file = FileCreate(
                 type=file_type, name=file_name, path=file_path, size=file_size
             )
-            variables = gets.getThresholds(file)
-            file.total_points = gets.get_total_points(file)
+            file_stats = gets.get_file_stats(file_path)
+            variables = file_stats["thresholds"]
+            file.total_points = file_stats["total_points"]
+            histos = file_stats["histograms"]
             for key, value in variables.items():
                 value.thr_min_sel = value.thr_min
                 value.thr_max_sel = value.thr_max
                 variable = VariableBase(**value.model_dump())
                 file.variables.append(variable)
             mapping_files[file.path] = file
-        return mapping_files
+            mapping_histos[file.path] = histos
+        return mapping_files, mapping_histos
 
     @staticmethod
     def read_data_test(file_paths: List[str]) -> Dict[str, FileCreate]:

@@ -138,3 +138,9 @@ def update_render(
     return service.update_render(
         project_id=project_id, file_id=file_id, render_data=render_data
     )
+
+
+@router.get("/{project_id}/file/{file_id}/histos")
+def get_histos(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get histograms for a file in a project"""
+    return service.get_histos(project_id=project_id, file_id=file_id)

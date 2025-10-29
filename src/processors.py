@@ -8,10 +8,16 @@ from src.loaders import load_data
 from src.utils import getFileType
 
 
-def fits_to_dataframe(file: FileRead = None, progress_callback=None):
+def downsample_dataframe(file: FileRead, df: pl.DataFrame) -> pl.DataFrame:
+    if file and "downsampling" in file.model_dump():
+        df = df.sample(fraction=file.downsampling)
+    return df
+
+
+def fits_to_dataframe(file_path: str, progress_callback=None):
 
     # Load the spectral cube
-    with load_data(file.path) as obs:
+    with load_data(file_path) as obs:
         table = Table(obs[0].data)
 
         def expand_table(table, progress_callback=None):
@@ -36,9 +42,6 @@ def fits_to_dataframe(file: FileRead = None, progress_callback=None):
 
     del obs
     gc.collect()
-
-    if file and "downsampling" in file.model_dump():
-        df = df.sample(fraction=file.downsampling)
 
     return df
 
@@ -70,9 +73,6 @@ def pynbody_to_dataframe(file: FileRead, family=None, progress_callback=None):
     del sim
     gc.collect()
 
-    if file and "downsampling" in file.model_dump():
-        df = df.sample(fraction=file.downsampling)
-
     return df
 
 
@@ -92,9 +92,10 @@ def convertToDataframe(
     file: FileRead, family=None, progress_callback=None
 ) -> pl.DataFrame:
     if getFileType(file.path) == "fits":
-        df = fits_to_dataframe(file, progress_callback)
+        df = fits_to_dataframe(file.path, progress_callback)
 
     else:
         df = pynbody_to_dataframe(file, family, progress_callback)
+    df = downsample_dataframe(file, df)
 
     return filter_dataframe(df, file)

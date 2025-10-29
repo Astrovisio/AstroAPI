@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import List, Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from .file import FileBase
+from .histo import HistoBase
 from .project import ProjectBase
 
 
@@ -103,3 +105,15 @@ class ProcessJob(SQLModel, table=True):
     error: Optional[str] = Field(default=None, nullable=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class VariableHistogram(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    variable_id: int = Field(foreign_key="variable.id")
+
+
+class HistogramBin(HistoBase, table=True):
+    __table_args__ = (UniqueConstraint("histogram_id", "bin_index"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    histogram_id: int = Field(foreign_key="variablehistogram.id")
