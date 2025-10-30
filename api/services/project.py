@@ -157,11 +157,15 @@ class ProjectService:
         # Files to add
         files_to_add = new_file_paths_set - current_file_paths
         if files_to_add:
-            file_variables_map = data_processor.read_data(list(files_to_add))
+            file_variables_map, file_histos_map = data_processor.read_data(
+                list(files_to_add)
+            )
             file_service = FileService(self.session)
             file_service.add_files_to_project(
                 project_id, list(files_to_add), file_variables_map
             )
+
+            file_service.add_histos_to_file(file_histos_map)
             self.session.commit()
 
         return self.get_project(project_id)
