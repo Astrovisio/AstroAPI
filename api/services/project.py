@@ -23,6 +23,18 @@ from .variable import VariableService
 
 
 class ProjectService:
+    """API-tied service for the Project entity.
+
+    Purpose:
+    - Provide CRUD operations consumed by API routes (create/read/update/delete projects).
+    - Orchestrate ingestion of files/variables and persistence of histograms.
+
+    Responsibilities:
+    - List/read single/all projects; update metadata and file order; duplicate/delete projects.
+    - Replace a project’s file set and reconcile adds/removals.
+    - Collaborates with FileService and VariableService.
+    """
+
     def __init__(self, session: Session):
         self.session = session
 

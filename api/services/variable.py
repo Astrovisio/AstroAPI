@@ -13,6 +13,17 @@ from api.models import (
 
 
 class VariableService:
+    """API-tied service for per-variable configuration and views.
+
+    Purpose:
+    - Provide CRUD operations for per-project variable configs consumed by API routes.
+
+    Responsibilities:
+    - Build VariableRead by combining Variable with ProjectFileVariableConfig.
+    - Read/update variable thresholds, selection, axes, etc., for a project-file pair.
+    - Fetch configs in bulk for a project-file pair and apply sane defaults.
+    """
+
     def __init__(self, session: Session):
         self.session = session
 

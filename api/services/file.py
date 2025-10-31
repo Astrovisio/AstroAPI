@@ -27,6 +27,19 @@ from .variable import VariableService
 
 
 class FileService:
+    """API-tied service for the File entity within a Project.
+
+    Purpose:
+    - Provide CRUD operations consumed by API routes (add/read/update/remove project files).
+
+    Responsibilities:
+    - Read/update file links (processed flags, downsampling, order) and per-variable configs.
+    - Manage processed artifact caching and resets on updates.
+    - Create/delete File and related Variable rows as needed.
+    - Persist/retrieve variable histograms; manage render settings and per-file noise.
+    - Updates Project.last_opened on read/update; deletes renders and clears noise on updates.
+    """
+
     def __init__(self, session: Session):
         self.session = session
 
