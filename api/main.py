@@ -1,17 +1,12 @@
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi.exceptions import RequestValidationError
-from sqlalchemy.exc import SQLAlchemyError
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from api.db import create_db_and_tables
-from api.error_handlers import (
-    api_exception_handler,
-    pydantic_validation_exception_handler,
-    sqlalchemy_exception_handler,
-)
 from api.exceptions import APIException
+from api.routes.jobs import router as jobs_router
 from api.routes.projects import router as projects_router
 
 
@@ -21,11 +16,19 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, debug=True)
 
-app.add_exception_handler(APIException, api_exception_handler)
-app.add_exception_handler(SQLAlchemyError, sqlalchemy_exception_handler)
-app.add_exception_handler(RequestValidationError, pydantic_validation_exception_handler)
+
+@app.exception_handler(APIException)
+async def api_exception_handler(request: Request, exc: APIException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error_code": exc.error_code,
+            "detail": exc.detail,
+            "context": exc.context,
+        },
+    )
 
 
 @app.get("/api/health")
@@ -34,6 +37,7 @@ def health():
 
 
 app.include_router(projects_router, prefix="/api")
+app.include_router(jobs_router, prefix="/api")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="debug")

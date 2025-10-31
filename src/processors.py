@@ -1,119 +1,101 @@
-import numpy as np
-import pandas as pd
+import gc
 
-from api.models import ConfigProcessRead
-from src.loaders import loadObservation, loadSimulation
+import polars as pl
+from astropy.table import Table
+
+from api.models import FileRead
+from src.loaders import load_data
 from src.utils import getFileType
 
 
-def fits_to_dataframe(path, config: ConfigProcessRead = None):
+def downsample_dataframe(file: FileRead, df: pl.DataFrame) -> pl.DataFrame:
+    if file and "downsampling" in file.model_dump():
+        df = df.sample(fraction=file.downsampling)
+    return df
+
+
+def fits_to_dataframe(file_path: str, progress_callback=None):
 
     # Load the spectral cube
-    cube = loadObservation(path)
+    with load_data(file_path) as obs:
+        table = Table(obs[0].data)
 
-    df_list = []
+        def expand_table(table, progress_callback=None):
+            total = len(table.columns)
+            for idx, col in enumerate(table.columns):
+                df = pl.from_pandas(Table(table[col]).to_pandas())
+                df.columns = [str(i) for i in range(len(df.columns))]
+                df = df.with_row_index("y").with_columns(pl.col("y").cast(pl.UInt16))
+                df = df.unpivot(index="y", variable_name="x").with_columns(
+                    pl.col("x").cast(pl.UInt16)
+                )
+                df = df.with_columns(pl.lit(col.split("col")[1], pl.UInt16).alias("z"))
+                df = df.remove(pl.col("value") == 0).drop_nulls(subset=["value"])
+                df = df["x", "y", "z", "value"]
+                if progress_callback:
+                    progress_callback((idx + 1) / total)
+                yield (df)
 
-    # Iterate over the spectral axis (velocity axis)
-    for i in range(cube.shape[0]):
-        # Slice one spectral frame at a time
-        slab = cube[i, :, :]  # shape: (y, x)
+        df = pl.concat(expand_table(table, progress_callback))[["x", "y", "z", "value"]]
 
-        # Get world coordinates for this frame
-        world = slab.wcs.pixel_to_world_values(
-            *np.meshgrid(
-                np.arange(cube.shape[2]),  # x (RA)
-                np.arange(cube.shape[1]),  # y (Dec)
-                indexing="xy",
-            )
-        )
+        del table
 
-        ra = world[0].flatten()
-        dec = world[1].flatten()
-        velo = cube.spectral_axis[i].value  # Single velocity value for this slice
-        intensity = slab.filled_data[:].value.flatten()
+    del obs
+    gc.collect()
 
-        # Build DataFrame for this slab
-        df_slice = pd.DataFrame(
-            {"velocity": velo, "ra": ra, "dec": dec, "intensity": intensity}
-        )
-
-        df_list.append(df_slice)
-
-    # Concatenate all slices into a single DataFrame
-    df = pd.concat(df_list, ignore_index=True)
-    df.dropna(inplace=True)
-    del cube
-    if not config:
-        return df
-    df_sampled = df.sample(frac=config.downsampling)
-
-    return df_sampled
+    return df
 
 
-def pynbody_to_dataframe(path, config: ConfigProcessRead, family=None):
+def pynbody_to_dataframe(file: FileRead, family=None, progress_callback=None):
+    with load_data(file.path) as sim:
 
-    sim = loadSimulation(path, family)
+        sim.physical_units()
 
-    sim.physical_units()
+        def variable_series(sim, file, progress_callback=None):
+            dtype = pl.Float32
+            total = len(file.variables)
+            for idx, var in enumerate(file.variables):
+                var_name = var.var_name
+                if var.selected:
+                    if "-" in var_name:
+                        base_key, i = var_name.split("-")
+                        name = f"{base_key}-{i}"
+                        arr = sim[base_key][:, int(i)]
+                    else:
+                        name = var_name
+                        arr = sim[var_name]
+                    if progress_callback:
+                        progress_callback((idx + 1) / total)
+                    yield pl.Series(name=name, values=arr, dtype=dtype)
 
-    data = {}
-
-    for key, value in config.variables.items():
-        if value.selected:
-            if "-" in key:
-                key, i = key.split("-")
-                data[f"{key}-{i}"] = sim[key][:, int(i)].astype(float)
-
-            else:
-                data[key] = sim[key].astype(float)
-
-    df = pd.DataFrame(data)
-
-    df_sampled = df.sample(frac=config.downsampling)
+        df = pl.DataFrame(variable_series(sim, file, progress_callback))
 
     del sim
+    gc.collect()
 
-    return df_sampled
+    return df
 
 
-def filter_dataframe(df: pd.DataFrame, config: ConfigProcessRead) -> pd.DataFrame:
-    filtered_df = df.copy()
+def filter_dataframe(df: pl.DataFrame, file: FileRead) -> pl.DataFrame:
+    filtered_df: pl.DataFrame = df.clone()
 
-    for var_name, var_config in config.variables.items():
-
-        if var_config.selected:
-            if var_name in ["x", "y", "z"]:
-                print(
-                    f"Filtering {var_name} with thresholds {var_config.thr_min_sel} and {var_config.thr_max_sel}"
-                )
-                # Filter the DataFrame based on the specified thresholds
-                filtered_df = filtered_df[
-                    (filtered_df[var_name] >= var_config.thr_min_sel)
-                    & (filtered_df[var_name] <= var_config.thr_max_sel)
-                ]
-            else:
-                print(
-                    f"Setting {var_name} values to 0 if outside thresholds {var_config.thr_min_sel} and {var_config.thr_max_sel}"
-                )
-                filtered_df.loc[
-                    (filtered_df[var_name] < var_config.thr_min_sel)
-                    | (filtered_df[var_name] > var_config.thr_max_sel),
-                    var_name,
-                ] = 0
+    for var in file.variables:
+        if var.selected and var.thr_min_sel and var.thr_max_sel:
+            filtered_df = filtered_df.filter(
+                pl.col(var.var_name).is_between(var.thr_min_sel, var.thr_max_sel)
+            )
 
     return filtered_df
 
 
 def convertToDataframe(
-    path, config: ConfigProcessRead, family=None
-) -> pd.DataFrame:  # Maybe needs a better name
-
-    if getFileType(path) == "fits":
-        df = fits_to_dataframe(
-            path, config
-        )  # When we load an observation since the available data will always be just "x,y,z,intensity" it's meaningless to drop unused axes, we always need all 4
+    file: FileRead, family=None, progress_callback=None
+) -> pl.DataFrame:
+    if getFileType(file.path) == "fits":
+        df = fits_to_dataframe(file.path, progress_callback)
 
     else:
-        df = pynbody_to_dataframe(path, config, family)
+        df = pynbody_to_dataframe(file, family, progress_callback)
+    df = downsample_dataframe(file, df)
 
-    return filter_dataframe(df, config)
+    return filter_dataframe(df, file)

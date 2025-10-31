@@ -1,87 +1,146 @@
 from typing import List
 
-import msgpack
 from fastapi import APIRouter, Response
 
-from api.crud import crud_config_process, crud_project, update_project_config
-from api.db import SessionDep
-from api.exceptions import DataProcessingError, ProjectNotFoundError
-from api.models import ConfigProcessRead, ProjectCreate, ProjectRead, ProjectUpdate
-from api.utils import data_processor
+from api.deps import FileServiceDep, ProcessJobServiceDep, ProjectServiceDep
+from api.models import (
+    FileRead,
+    FileUpdate,
+    ProjectCreate,
+    ProjectDuplicate,
+    ProjectFilesUpdate,
+    ProjectRead,
+    ProjectUpdate,
+    RenderRead,
+    RenderUpdate,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 @router.get("/", response_model=List[ProjectRead])
-def read_projects(*, session: SessionDep):
-    return crud_project.get_projects(session)
+def read_projects(*, service: ProjectServiceDep):
+    """Get all projects"""
+    return service.get_projects()
 
 
 @router.post("/", response_model=ProjectRead)
-def create_new_project(*, session: SessionDep, project: ProjectCreate):
-    project = crud_project.create_project(session, project)
-    confs = data_processor.read_data(project.files)
-    for file, vars in confs.items():
-        for var_name, conf in vars.items():
-            conf_db = crud_config_process.create_config_process(
-                session, conf, project.id
-            )
-            crud_config_process.associate_config_file(session, conf_db.id, file)
-    conf_read = crud_config_process._build_config_process_read(session, project.id)
+def create_project(*, project_data: ProjectCreate, service: ProjectServiceDep):
+    """Create a new project with files and variables."""
 
-    project_read = ProjectRead.model_validate(project)
-    project_read.paths = [file.path for file in project.files]
-    project_read.config_process = conf_read
-
-    return project_read
+    return service.create_project(project_data=project_data)
 
 
 @router.get("/{project_id}", response_model=ProjectRead)
-def read_project(*, session: SessionDep, project_id: int):
-    project = crud_project.get_project(session, project_id)
-    if not project:
-        raise ProjectNotFoundError(project_id)
-    return project
+def read_project(*, project_id: int, service: ProjectServiceDep):
+    """Get a single project"""
+    return service.get_project(project_id=project_id)
 
 
 @router.put("/{project_id}", response_model=ProjectRead)
-def update_project(*, session: SessionDep, project_id: int, project: ProjectUpdate):
-    project_db = crud_project.update_project(session, project_id, project)
-    conf_read = crud_config_process._build_config_process_read(session, project_id)
-
-    project_read = ProjectRead.model_validate(project_db)
-    project_read.paths = [file.path for file in project_db.files]
-    project_read.config_process = conf_read
-    return project_read
+def update_project(
+    *, project_id: int, project: ProjectUpdate, service: ProjectServiceDep
+):
+    """Update project and optionally its files"""
+    return service.update_project(project_id=project_id, project_update=project)
 
 
 @router.delete("/{project_id}")
-def remove_project(*, session: SessionDep, project_id: int):
-    crud_project.delete_project(session, project_id)
+def delete_project(*, project_id: int, service: ProjectServiceDep):
+    """Delete a project"""
+    service.delete_project(project_id)
     return {"message": "Project deleted successfully"}
 
 
-@router.post("/{project_id}/process", response_class=Response)
-def process(*, session: SessionDep, project_id: int, config: ConfigProcessRead):
-    project = crud_project.get_project(session, project_id)
-    if not project:
-        raise ProjectNotFoundError(project_id)
-
-    try:
-        paths = project.paths
-        update_project_config(session, project_id, config)
-        processed_data = data_processor.process_data(project_id, paths, config)
-        data_dict = {
-            "columns": processed_data.columns.tolist(),
-            "rows": processed_data.values.tolist(),
-        }
-        binary_data = msgpack.packb(data_dict, use_bin_type=True)
-        return Response(content=binary_data, media_type="application/octet-stream")
-    except Exception as e:
-        raise DataProcessingError(str(e), {"project_id": project_id})
+@router.post("/{project_id}/duplicate", response_model=ProjectRead)
+def duplicate_project(
+    *, project_id: int, project: ProjectDuplicate, service: ProjectServiceDep
+):
+    """Delete a project"""
+    return service.duplicate_project(project_id=project_id, project=project)
 
 
-# @router.post("/{project_id}/render")
-# def create_render_config(*, session: SessionDep, project_id: int, config: ConfigRender):
-#     config.project_id = project_id
-#     return crud_config_render.create_render(session, config)
+@router.put("/{project_id}/files", response_model=ProjectRead)
+def replace_project_files(
+    *, project_id: int, files_update: ProjectFilesUpdate, service: ProjectServiceDep
+):
+    """Replace all files in a project"""
+    return service.replace_project_files(
+        project_id=project_id, new_file_paths=files_update.paths
+    )
+
+
+@router.get("/{project_id}/file/{file_id}", response_model=FileRead)
+def read_file(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get a single file in a project"""
+    return service.get_file(project_id=project_id, file_id=file_id)
+
+
+@router.put("/{project_id}/file/{file_id}", response_model=FileRead)
+def update_file(
+    *, project_id: int, file_id: int, file_data: FileUpdate, service: FileServiceDep
+):
+    """Update a file in a project"""
+    return service.update_file(
+        project_id=project_id, file_id=file_id, file_update=file_data
+    )
+
+
+@router.get("/{project_id}/file/{file_id}/process")
+def processed_file(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get processed file"""
+
+    file = service.get_cached_file(project_id=project_id, file_id=file_id)
+    if not file:
+        return Response(
+            content="File not found", status_code=404, media_type="text/plain"
+        )
+    if not file.processed:
+        return Response(
+            content="File not processed yet",
+            status_code=400,
+            media_type="text/plain",
+        )
+
+    with open(file.processed_path, "rb") as f:
+        data = f.read()
+    return Response(content=data, media_type="application/octet-stream")
+
+
+@router.post("/{project_id}/file/{file_id}/process")
+def process_file(
+    *,
+    project_id: int,
+    file_id: int,
+    pjservice: ProcessJobServiceDep,
+    fservice: FileServiceDep,
+):
+    """Start processing a file"""
+
+    job_id = pjservice.start_file_processing(project_id=project_id, file_id=file_id)
+
+    fservice.create_render(project_id=project_id, file_id=file_id)
+
+    return {"job_id": job_id}
+
+
+@router.get("/{project_id}/file/{file_id}/render", response_model=RenderRead)
+def get_render(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get render settings for a file in a project"""
+    return service.get_render(project_id=project_id, file_id=file_id)
+
+
+@router.put("/{project_id}/file/{file_id}/render", response_model=RenderRead)
+def update_render(
+    *, project_id: int, file_id: int, render_data: RenderUpdate, service: FileServiceDep
+):
+    """Update render settings for a file in a project"""
+    return service.update_render(
+        project_id=project_id, file_id=file_id, render_data=render_data
+    )
+
+
+@router.get("/{project_id}/file/{file_id}/histos")
+def get_histos(*, project_id: int, file_id: int, service: FileServiceDep):
+    """Get histograms for a file in a project"""
+    return service.get_histos(project_id=project_id, file_id=file_id)
