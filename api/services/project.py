@@ -23,6 +23,18 @@ from .variable import VariableService
 
 
 class ProjectService:
+    """API-tied service for the Project entity.
+
+    Purpose:
+    - Provide CRUD operations consumed by API routes (create/read/update/delete projects).
+    - Orchestrate ingestion of files/variables and persistence of histograms.
+
+    Responsibilities:
+    - List/read single/all projects; update metadata and file order; duplicate/delete projects.
+    - Replace a project’s file set and reconcile adds/removals.
+    - Collaborates with FileService and VariableService.
+    """
+
     def __init__(self, session: Session):
         self.session = session
 
@@ -31,7 +43,9 @@ class ProjectService:
         Create a project with files and their variables in one transaction.
         Implements caching - reuses existing processed files.
         """
-        file_variables_map = data_processor.read_data(project_data.paths)
+        file_variables_map, file_histos_map = data_processor.read_data(
+            project_data.paths
+        )
 
         db_project = Project(
             name=project_data.name,
@@ -45,6 +59,8 @@ class ProjectService:
         file_service.add_files_to_project(
             db_project.id, project_data.paths, file_variables_map
         )
+
+        file_service.add_histos_to_file(file_histos_map)
 
         self.session.commit()
         self.session.refresh(db_project)
@@ -153,11 +169,15 @@ class ProjectService:
         # Files to add
         files_to_add = new_file_paths_set - current_file_paths
         if files_to_add:
-            file_variables_map = data_processor.read_data(list(files_to_add))
+            file_variables_map, file_histos_map = data_processor.read_data(
+                list(files_to_add)
+            )
             file_service = FileService(self.session)
             file_service.add_files_to_project(
                 project_id, list(files_to_add), file_variables_map
             )
+
+            file_service.add_histos_to_file(file_histos_map)
             self.session.commit()
 
         return self.get_project(project_id)

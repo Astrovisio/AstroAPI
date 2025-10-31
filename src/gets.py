@@ -3,7 +3,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from api.models import FileCreate, VariableBase
+from api.models import HistoBase, VariableBase
 from src.loaders import load_data
 from src.processors import fits_to_dataframe
 from src.utils import getFileType
@@ -38,84 +38,108 @@ def finite_min_max(series):
     return float(np.nanmin(data)), float(np.nanmax(data))
 
 
-def get_total_points(file: FileCreate) -> int:
+def get_file_stats(file: str, nbins: int = 50) -> Dict[str, object]:
+    def build_bins(counts: np.ndarray, edges: np.ndarray) -> List[HistoBase]:
+        if counts is None and edges is None:
+            return []
+        bins: List[HistoBase] = []
+        for i in range(len(counts)):
+            bins.append(
+                HistoBase(
+                    bin_index=int(i),
+                    bin_min=float(edges[i]),
+                    bin_max=float(edges[i + 1]),
+                    count=int(counts[i]),
+                )
+            )
+        return bins
+
+    thresholds: Dict[str, VariableBase] = {}
+    histograms: Dict[str, List[HistoBase]] = {}
     total_points = 0
 
-    if getFileType(file.path) == "fits":
-
+    if getFileType(file) == "fits":
         cube = fits_to_dataframe(file)
         total_points = cube.shape[0]
-        del cube
-
-    else:
-
-        with load_data(file.path) as sim:
-            total_points = len(sim)
-
-        del sim
-
-    gc.collect()
-
-    return total_points
-
-
-def getThresholds(file: FileCreate, family=None) -> Dict[str, VariableBase]:
-
-    res = {}
-
-    if getFileType(file.path) == "fits":
-
-        cube = fits_to_dataframe(file)
         thr_min, thr_max = finite_min_max(cube["value"])
-
         for key in ("x", "y", "z", "value"):
-            res[key] = VariableBase(
+            thresholds[key] = VariableBase(
                 var_name=key,
                 thr_min=thr_min,
                 thr_max=thr_max,
                 unit=key,
             )
-
+        for key, var in thresholds.items():
+            if key not in cube.columns:
+                continue
+            data = cube[key].to_numpy()
+            data = data[np.isfinite(data)]
+            try:
+                counts, edges = np.histogram(
+                    data, bins=nbins, range=(var.thr_min, var.thr_max)
+                )
+            except ValueError:
+                counts, edges = None, None
+            histograms[key] = build_bins(counts, edges)
         del cube
-
     else:
-
-        def compute_thresholds(sim):
+        with load_data(file) as sim:
+            sim.physical_units()
+            total_points = len(sim)
 
             keys = ["x", "y", "z"] + sim.loadable_keys()
             keys.remove("pos")
 
             for key in keys:
                 data = sim[key]
-                if data.ndim > 1:
+                if getattr(data, "ndim", 1) > 1:
                     for i in range(data.shape[1]):
                         subarray = data[:, i]
                         subarray = subarray[np.isfinite(subarray)]
                         var_name = f"{key}-{i}"
-                        res = VariableBase(
+
+                        thr_min = float(np.nanmin(subarray))
+                        thr_max = float(np.nanmax(subarray))
+                        thresholds[var_name] = VariableBase(
                             var_name=var_name,
-                            thr_min=float(np.nanmin(subarray)),
-                            thr_max=float(np.nanmax(subarray)),
+                            thr_min=thr_min,
+                            thr_max=thr_max,
                             unit=str(data.units),
                         )
-                        yield var_name, res
+
+                        try:
+                            counts, edges = np.histogram(
+                                subarray, bins=nbins, range=(thr_min, thr_max)
+                            )
+                        except ValueError:
+                            # handle the case where all values are identical
+                            counts, edges = None, None
+                        histograms[var_name] = build_bins(counts, edges)
                 else:
-                    subarray = data[np.isfinite(data)]
-                    res = VariableBase(
+                    arr = data[np.isfinite(data)]
+
+                    thr_min = float(np.nanmin(arr))
+                    thr_max = float(np.nanmax(arr))
+                    thresholds[key] = VariableBase(
                         var_name=key,
-                        thr_min=float(np.nanmin(subarray)),
-                        thr_max=float(np.nanmax(subarray)),
+                        thr_min=thr_min,
+                        thr_max=thr_max,
                         unit=str(data.units),
                     )
-                    yield key, res
 
-        with load_data(file.path) as sim:
-            sim.physical_units()
-
-            res = dict(compute_thresholds(sim))
-
-        del sim
+                    try:
+                        counts, edges = np.histogram(
+                            arr, bins=nbins, range=(thr_min, thr_max)
+                        )
+                    except ValueError:
+                        # handle the case where all values are identical
+                        counts, edges = None, None
+                    histograms[key] = build_bins(counts, edges)
+            del sim
 
     gc.collect()
-
-    return res
+    return {
+        "total_points": total_points,
+        "thresholds": thresholds,
+        "histograms": histograms,
+    }

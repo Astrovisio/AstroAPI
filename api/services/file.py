@@ -12,6 +12,7 @@ from api.models import (
     FileProjectLink,
     FileRead,
     FileUpdate,
+    HistogramBin,
     Project,
     ProjectFileVariableConfig,
     RenderBase,
@@ -19,12 +20,26 @@ from api.models import (
     RenderSettings,
     RenderUpdate,
     Variable,
+    VariableHistogram,
 )
 
 from .variable import VariableService
 
 
 class FileService:
+    """API-tied service for the File entity within a Project.
+
+    Purpose:
+    - Provide CRUD operations consumed by API routes (add/read/update/remove project files).
+
+    Responsibilities:
+    - Read/update file links (processed flags, downsampling, order) and per-variable configs.
+    - Manage processed artifact caching and resets on updates.
+    - Create/delete File and related Variable rows as needed.
+    - Persist/retrieve variable histograms; manage render settings and per-file noise.
+    - Updates Project.last_opened on read/update; deletes renders and clears noise on updates.
+    """
+
     def __init__(self, session: Session):
         self.session = session
 
@@ -217,6 +232,134 @@ class FileService:
             if not existing_link:
                 link = FileProjectLink(project_id=project_id, file_id=db_file.id)
                 self.session.add(link)
+
+    def add_histos_to_file(
+        self, file_histos_map: Dict[str, Dict[str, List[dict]]]
+    ) -> None:
+        """
+        Persist histograms for variables per file.
+
+        file_histos_map structure example:
+        {
+            "/abs/path/file1": {
+                "var_name1": [ {bin_index, bin_min, bin_max, count}, ... ],
+                "var_name2": [ ... ],
+            },
+            ...
+        }
+        """
+        for file_path, var_histos in file_histos_map.items():
+            db_file = self.session.exec(
+                select(File).where(File.path == file_path)
+            ).first()
+            if not db_file:
+                continue  # Skip unknown files
+
+            for var_name, bins in var_histos.items():
+                db_var = self.session.exec(
+                    select(Variable).where(
+                        Variable.file_id == db_file.id,
+                        Variable.var_name == var_name,
+                    )
+                ).first()
+                if not db_var:
+                    continue  # Skip unknown variables
+
+                # Remove existing histograms for this variable (if any)
+                existing_hists = self.session.exec(
+                    select(VariableHistogram).where(
+                        VariableHistogram.variable_id == db_var.id
+                    )
+                ).all()
+                for eh in existing_hists:
+                    existing_bins = self.session.exec(
+                        select(HistogramBin).where(HistogramBin.histogram_id == eh.id)
+                    ).all()
+                    for eb in existing_bins:
+                        self.session.delete(eb)
+                    self.session.delete(eh)
+                if existing_hists:
+                    self.session.flush()
+
+                # Create new histogram and bins
+                vh = VariableHistogram(variable_id=db_var.id)
+                self.session.add(vh)
+                self.session.flush()  # get vh.id
+
+                def _get(x, k):
+                    return x.get(k) if isinstance(x, dict) else getattr(x, k)
+
+                for b in bins or []:
+                    hb = HistogramBin(
+                        histogram_id=vh.id,
+                        bin_index=int(_get(b, "bin_index")),
+                        bin_min=float(_get(b, "bin_min")),
+                        bin_max=float(_get(b, "bin_max")),
+                        count=int(_get(b, "count")),
+                    )
+                    self.session.add(hb)
+
+        self.session.commit()
+
+    def get_histos(self, *, project_id: int, file_id: int) -> dict[str, list[dict]]:
+        """
+        Return histograms for all variables of a file in a project as:
+        {
+            "<var_name>": [ {bin_index, bin_min, bin_max, count}, ... ],
+            ...
+        }
+        """
+        # Validate project, file, and membership
+        project = self.session.get(Project, project_id)
+        if not project:
+            raise ProjectNotFoundError(project_id)
+        file = self.session.get(File, file_id)
+        if not file:
+            raise FileNotFoundError(file_id)
+        link = self.session.exec(
+            select(FileProjectLink).where(
+                FileProjectLink.project_id == project_id,
+                FileProjectLink.file_id == file_id,
+            )
+        ).first()
+        if not link:
+            # File not part of the project
+            raise FileNotFoundError(file_id)
+
+        out: dict[str, list[dict]] = {}
+        variables = self.session.exec(
+            select(Variable).where(Variable.file_id == file_id)
+        ).all()
+        if not variables:
+            return out
+
+        for var in variables:
+            # Use the most recent histogram if multiple exist
+            vh = self.session.exec(
+                select(VariableHistogram)
+                .where(VariableHistogram.variable_id == var.id)
+                .order_by(VariableHistogram.id.desc())
+            ).first()
+            if not vh:
+                continue
+
+            bins = self.session.exec(
+                select(HistogramBin)
+                .where(HistogramBin.histogram_id == vh.id)
+                .order_by(HistogramBin.bin_index)
+            ).all()
+
+            out[var.var_name] = [
+                {
+                    "bin_index": int(b.bin_index),
+                    "bin_min": float(b.bin_min),
+                    "bin_max": float(b.bin_max),
+                    "count": int(b.count),
+                }
+                for b in bins
+            ]
+
+        return out
 
     def create_render(self, project_id: int, file_id: int) -> None:
         """Create default render settings for a specific file"""
