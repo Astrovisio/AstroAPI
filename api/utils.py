@@ -105,7 +105,9 @@ class DataProcessor:
             if progress_callback:
                 progress_callback(progress * 0.8)
 
-        df = processors.convertToDataframe()
+        df = processors.convertToDataframe(
+            file=file_config, progress_callback=scaled_callback
+        )
         if progress_callback:
             progress_callback(0.85)
         combined_df = pl.concat([combined_df, df]).unique()
