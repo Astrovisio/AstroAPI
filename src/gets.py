@@ -61,23 +61,20 @@ def get_file_stats(file: str, nbins: int = 50) -> Dict[str, object]:
     if getFileType(file) == "fits":
         cube = fits_to_dataframe(file)
         total_points = cube.shape[0]
-        thr_min, thr_max = finite_min_max(cube["value"])
         for key in ("x", "y", "z", "value"):
+            if key not in cube.columns:
+                continue
+            thr_min, thr_max = finite_min_max(cube[key])
             thresholds[key] = VariableBase(
                 var_name=key,
                 thr_min=thr_min,
                 thr_max=thr_max,
                 unit=key,
             )
-        for key, var in thresholds.items():
-            if key not in cube.columns:
-                continue
             data = cube[key].to_numpy()
             data = data[np.isfinite(data)]
             try:
-                counts, edges = np.histogram(
-                    data, bins=nbins, range=(var.thr_min, var.thr_max)
-                )
+                counts, edges = np.histogram(data, bins=nbins, range=(thr_min, thr_max))
             except ValueError:
                 counts, edges = None, None
             histograms[key] = build_bins(counts, edges)
