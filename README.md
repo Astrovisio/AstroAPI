@@ -45,6 +45,23 @@ Example (Linux):
 rm -rf /path/to/astrodata/astrovisio_files
 ```
 
+## HDF5 file requirements
+AstroAPI reads HDF5 snapshots via pynbody. Any HDF5 format that pynbody opens (e.g., Gadget HDF5) is supported.
+
+Minimum structure
+- Particles organized in standard Gadget-style groups
+- Per-particle datasets:
+  - Positions as (N, 3)
+  - Scalars as (N,)
+  - Vectors as (N, 3) arrays (e.g., Velocities, MagneticField). The API expands vectors as name-0, name-1, name-2.
+- All arrays must be numeric and share the same length N.
+- Finite data: NaN/Inf are ignored
+
+## FITS file requirements
+
+- Currently, only FITS files are supported for processing and visualization.
+- The Primary HDU must contain a 3D data cube (NAXIS=3), i.e., three axes + one data value dimension to visualize.
+
 ## Data model concepts (high level)
 
 - Project: A collection of files plus per-variable configurations.
